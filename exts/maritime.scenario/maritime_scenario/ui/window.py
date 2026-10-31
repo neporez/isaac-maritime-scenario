@@ -78,10 +78,10 @@ class ScenarioWindow:
 
   # ------------------------------------------------------------ Build / status / assets folder
   def _build_setup_section(self):
-    with ui.HStack(spacing=6):
+    with ui.HStack(spacing=6, style={"margin": 0}):
       ui.Button("Build scene", height=28, width=110, clicked_fn=self._on_build_clicked)
       self._status_label = ui.Label(self._status_text(), word_wrap=True, style={"color": 0xFFFFCC66})
-    with ui.HStack(spacing=6):
+    with ui.HStack(spacing=6, style={"margin": 0}):
       ui.Label("Boat assets:", width=80)
       self._mesh_dir_label = ui.Label(self._sc.get_mesh_dir() or "(not set)", word_wrap=True)
     ui.Button("Choose folder...", height=26, clicked_fn=self._on_choose_mesh_dir)
@@ -151,7 +151,7 @@ class ScenarioWindow:
     self._wave_slider("Steepness (0-1)", "steepness", 0.0, 1.0, wave.steepness)
     self._wave_slider("Wave trains", "num_waves", 1, 4, wave.num_waves, is_int=True, fmt="{}")
 
-    with ui.HStack(spacing=6):
+    with ui.HStack(spacing=6, style={"margin": 0}):
       ui.Label("Active radius (m)", width=150)
       active_radius_slider = ui.FloatSlider(min=50.0, max=2000.0, height=20)
       active_radius_slider.model.set_value(150.0)
@@ -165,7 +165,7 @@ class ScenarioWindow:
       active_radius_slider.model.add_value_changed_fn(_on_active_radius_changed)
 
   def _wave_slider(self, label, field, lo, hi, init, is_int=False, fmt="{:.2f}"):
-    with ui.HStack(spacing=6):
+    with ui.HStack(spacing=6, style={"margin": 0}):
       ui.Label(label, width=150)
       s = ui.IntSlider(min=lo, max=hi, height=20) if is_int else ui.FloatSlider(min=lo, max=hi, height=20)
       s.model.set_value(init)
@@ -180,7 +180,7 @@ class ScenarioWindow:
 
   # ------------------------------------------------------------ Water tiles
   def _build_wave_tiles_section(self):
-    with ui.HStack(spacing=6):
+    with ui.HStack(spacing=6, style={"margin": 0}):
       ui.Label("Tile size", width=90)
       self._tile_level_slider = ui.IntSlider(min=0, max=MAX_TILE_LEVEL, height=20)
       self._tile_level_slider.model.set_value(self._tile_placement.tile_level)
@@ -197,7 +197,7 @@ class ScenarioWindow:
 
       self._tile_level_slider.model.add_value_changed_fn(_on_level_changed)
       _refresh_tile_level_label()
-    with ui.HStack(spacing=6):
+    with ui.HStack(spacing=6, style={"margin": 0}):
       ui.Label("Base resolution", width=90)
       self._base_res_slider = ui.IntSlider(min=0, max=len(BASE_RES_DISPLAY_STEPS) - 1, height=20)
       current_display = self._tile_placement.base_resolution - 1   # real = displayed + 1, see constant
@@ -213,11 +213,11 @@ class ScenarioWindow:
         _refresh_tile_level_label()
 
       self._base_res_slider.model.add_value_changed_fn(_on_base_resolution_changed)
-    with ui.HStack(spacing=6):
+    with ui.HStack(spacing=6, style={"margin": 0}):
       ui.Button("Place tiles with mouse", height=30, clicked_fn=self._on_place_tile_with_mouse)
       ui.Button("Delete tile with mouse", height=30, clicked_fn=self._on_delete_tile_with_mouse)
       ui.Button("Stop", height=30, clicked_fn=lambda: self._tile_placement.cancel())
-    with ui.HStack(spacing=6):
+    with ui.HStack(spacing=6, style={"margin": 0}):
       ui.Button("Undo last tile", height=28, clicked_fn=lambda: self._tile_placement.undo_last())
       ui.Button("Clear all tiles", height=28, clicked_fn=lambda: self._sc.clear_water_tiles())
     self._tile_status_label = ui.Label("", height=18, word_wrap=True, style={"color": 0xFFFFCC66})
@@ -238,7 +238,7 @@ class ScenarioWindow:
     labels = [label for label, _ in self._mesh_choices] or ["(press Build scene first)"]
     self._own_ship_mesh_combo = ui.ComboBox(0, *labels, height=24)
 
-    with ui.HStack(spacing=6):
+    with ui.HStack(spacing=6, style={"margin": 0}):
       ui.Label("X (m)", width=40)
       self._ship_x_field = ui.FloatField(height=24)
       self._ship_x_field.model.add_value_changed_fn(
@@ -263,7 +263,7 @@ class ScenarioWindow:
 
     ui.Button("Apply to own ship", height=28, clicked_fn=_apply)
 
-    with ui.HStack(spacing=6):
+    with ui.HStack(spacing=6, style={"margin": 0}):
       ui.Label("Linear", width=50)
       self._ship_linear_field = ui.FloatField(height=24)
       self._ship_linear_field.model.set_value(0.3)
@@ -275,11 +275,11 @@ class ScenarioWindow:
       self._ship_angular_field.model.add_value_changed_fn(
         lambda m: self._sc.set_ship_speed(angular=m.get_value_as_float()))
 
-    with ui.HStack(spacing=0):
+    with ui.HStack(spacing=0, style={"margin": 0}):
       ui.Spacer(width=70)
       self._make_hold_button("Forward (I)", "forward", width=100)
       ui.Spacer(width=70)
-    with ui.HStack(spacing=0):
+    with ui.HStack(spacing=0, style={"margin": 0}):
       self._make_hold_button("Left (J)", "left", width=70)
       self._make_hold_button("Back (K)", "back", width=100)
       self._make_hold_button("Right (L)", "right", width=70)
@@ -320,7 +320,7 @@ class ScenarioWindow:
     self._physics_slider("Damping ratio", "damping_ratio", 0.0, 1.0, sp.damping_ratio)
 
   def _physics_slider(self, label, field, lo, hi, init, fmt="{:.2f}"):
-    with ui.HStack(spacing=6):
+    with ui.HStack(spacing=6, style={"margin": 0}):
       ui.Label(label, width=150)
       s = ui.FloatSlider(min=lo, max=hi, height=20)
       s.model.set_value(init)
@@ -337,13 +337,13 @@ class ScenarioWindow:
   def _build_vessel_section(self):
     labels = [label for label, _ in self._mesh_choices] or ["(press Build scene first)"]
 
-    with ui.HStack(spacing=6):
+    with ui.HStack(spacing=6, style={"margin": 0}):
       ui.Label("Mesh", width=60)
       self._vessel_mesh_combo = ui.ComboBox(0, *labels, height=24)
-    with ui.HStack(spacing=6):
+    with ui.HStack(spacing=6, style={"margin": 0}):
       ui.Label("Behavior", width=60)
       self._behavior_combo = ui.ComboBox(0, *BEHAVIORS, height=24)
-    with ui.HStack(spacing=6):
+    with ui.HStack(spacing=6, style={"margin": 0}):
       ui.Label("Linear", width=50)
       self._linear_field = ui.FloatField(height=24)
       self._linear_field.model.set_value(0.3)
@@ -352,43 +352,43 @@ class ScenarioWindow:
       self._angular_field.model.set_value(0.01)
       ui.Label("([ / ] rotate while placing)", style={"color": 0xFF888888})
 
-    with ui.HStack(spacing=6):
+    with ui.HStack(spacing=6, style={"margin": 0}):
       ui.Button("Place with mouse", height=30, clicked_fn=self._on_place_with_mouse)
       ui.Button("Finish Path", height=30, clicked_fn=lambda: self._placement.finish_path())
       ui.Button("Cancel", height=30, clicked_fn=lambda: self._placement.cancel())
     self._path_status_label = ui.Label("", height=18, style={"color": 0xFFFFCC66})
 
-    with ui.HStack(spacing=6):
+    with ui.HStack(spacing=6, style={"margin": 0}):
       ui.Label("X (m)", width=40)
       self._x_field = ui.FloatField(height=24)
       ui.Label("Y (m)", width=40)
       self._y_field = ui.FloatField(height=24)
-    with ui.HStack(spacing=6):
+    with ui.HStack(spacing=6, style={"margin": 0}):
       ui.Label("Yaw (deg)", width=70)
       self._yaw_field = ui.FloatField(height=24)
       self._yaw_field.model.add_value_changed_fn(lambda m: self._placement.set_yaw(m.get_value_as_float()))
       ui.Button("-", width=28, height=24, clicked_fn=lambda: self._placement.nudge_yaw(-1.0))
       ui.Button("+", width=28, height=24, clicked_fn=lambda: self._placement.nudge_yaw(1.0))
-    with ui.HStack(spacing=6):
+    with ui.HStack(spacing=6, style={"margin": 0}):
       ui.Label("Step (deg)", width=70)
       self._yaw_step_field = ui.FloatField(height=24)
       self._yaw_step_field.model.set_value(15.0)
       self._yaw_step_field.model.add_value_changed_fn(
         lambda m: self._placement.set_yaw_step(m.get_value_as_float()))
 
-    with ui.HStack(spacing=6):
+    with ui.HStack(spacing=6, style={"margin": 0}):
       ui.Label("Waypoints", width=70)
       self._waypoints_field = ui.StringField(height=24)
     ui.Button("Spawn vessel (typed position)", height=30, clicked_fn=self._on_spawn_vessel)
 
-    with ui.HStack(spacing=6):
+    with ui.HStack(spacing=6, style={"margin": 0}):
       show_paths_checkbox = ui.CheckBox(width=24, height=24)
       show_paths_checkbox.model.set_value(True)
       show_paths_checkbox.model.add_value_changed_fn(
         lambda m: self._placement.set_show_paths(m.get_value_as_bool()))
       ui.Label("Show paths", height=24)
 
-    with ui.HStack(spacing=6):
+    with ui.HStack(spacing=6, style={"margin": 0}):
       ui.Label("Random swarm count", width=120)
       self._count_field = ui.IntField(height=24)
       self._count_field.model.set_value(5)
@@ -468,7 +468,7 @@ class ScenarioWindow:
   def _build_save_load_section(self):
     self._filename_field = ui.StringField(height=24)
     self._filename_field.model.set_value("scenario1.json")
-    with ui.HStack(spacing=6):
+    with ui.HStack(spacing=6, style={"margin": 0}):
       ui.Button("Save", height=30, clicked_fn=lambda: self._sc.save(self._filename_field.model.get_value_as_string()))
       ui.Button("Load", height=30, clicked_fn=self._on_load_clicked)
 

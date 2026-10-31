@@ -800,6 +800,40 @@ X/Y/Z spawn fields, status moved inline, first committed test for tile_placement
   since the code is already at `spacing=0` everywhere and there is nothing left to blindly reduce further
   without rendering it.
 
+**Confirmed live: per-level grid shift wasn't enough at large tile sizes; the row-spacing gap is real and
+reproduces after reload (2026-11-02).**
+- User tested the single-constant `GRID_ORIGIN_SHIFT_M` fix live: placing the single BIGGEST tile over
+  the own ship at (0,0,0) still looked "basically at the corner" (not exactly on it, but close) -- exactly
+  what the math predicts (see below), just not what was communicated clearly enough beforehand. Replaced
+  with `LEVEL_SHIFTS_M`, a per-level list (`_compute_level_shifts()`, `ui/tile_placement.py`) instead of
+  one constant: centering the origin EXACTLY at every level simultaneously is mathematically impossible
+  under the nesting constraint `_try_merge_upward()`/coarsening depend on (centering level L exactly
+  needs `shift_L = size_L/2`, but two consecutive exact centers differ by exactly `size_L/2`, which is
+  never a multiple of `size_L` as the constraint requires) -- proved this, not just asserted it, before
+  picking an approach. `_compute_level_shifts()` instead greedily picks, at each level, whichever valid
+  shift lands closest to that level's own ideal center, which is achievable because set-subset relations
+  compose transitively (checking only CONSECUTIVE level pairs guarantees nesting across every pair, not
+  just adjacent ones). Measured result for `BASE_TILE_SIZE_M=32`/`MAX_TILE_LEVEL=6`: worst case 50% of
+  the way to an edge (level 1), 25-38% everywhere else -- vs the single-constant version's climbing
+  0/50/75/87.5/93.75/96.9/98.4% (origin visually indistinguishable from "at the corner" by level 4+).
+  50% is the proven best possible worst-case, not a number that can be improved further without relaxing
+  the nesting requirement itself. `tests/test_tile_placement_grid.py` grew a regression test asserting
+  this bound holds at every level, plus an updated nesting-subset test parameterized over
+  `LEVEL_SHIFTS_M` instead of one constant (119 tests total now, net unchanged since one test was
+  replaced rather than added).
+- User also confirmed, with a fresh screenshot taken AFTER reloading the extension, that the
+  Tile-size/Base-resolution row gap (and "everywhere, not just there") was still present despite
+  `spacing=0` already being live -- ruling out "stale reload" as the explanation (the standing caveat
+  from the previous round). Best remaining explanation: Kit's active theme likely bakes a default
+  per-widget `margin` onto specific widget types (sliders in particular) independent of the parent
+  `VStack`'s own `spacing`, which only controls space BETWEEN children, not each child's own intrinsic
+  margin. Added `style={"margin": 0}` to every one of this window's 24 `ui.HStack(...)` row containers
+  (every row in every section) as a defensive, blanket fix for exactly this -- **still not independently
+  confirmed live**, since this is still a best-effort diagnosis without being able to render the panel
+  directly; if rows are still visibly gapped after this, the next thing to check live is each individual
+  widget's own style (`ui.IntSlider`/`ui.ComboBox`/etc.) rather than their containers, since container-
+  level `spacing`/`margin` are now both at zero.
+
 ## Current status (as of 2026-10-30)
 
 Everything above is built: `core/` + `backends/wave.py`'s tile registry (119 passing tests total),

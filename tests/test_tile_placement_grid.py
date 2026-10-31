@@ -32,9 +32,9 @@ def _make():
 
 
 def test_origin_falls_strictly_inside_one_cell_at_every_level():
-  # Regression target (2026-11-01, found live): before GRID_ORIGIN_SHIFT_M, the world origin -- where
-  # the own ship always spawns -- sat exactly on the corner shared by 4 cells at every level, so placing
-  # water there always required 4 separate clicks just to cover the ship's spawn point.
+  # Regression target (2026-11-01, found live): before any shift, the world origin -- where the own ship
+  # always spawns -- sat exactly on the corner shared by 4 cells at every level, so placing water there
+  # always required 4 separate clicks just to cover the ship's spawn point.
   tp = _make()
   for level in range(tile_placement.MAX_TILE_LEVEL + 1):
     tp.tile_level = level
@@ -54,25 +54,36 @@ def test_origin_is_exactly_centered_at_the_smallest_level():
   assert (cx, cy) == (0.0, 0.0)
 
 
-def test_origin_cell_index_is_always_zero_zero():
+def test_origin_never_more_than_halfway_to_an_edge_at_any_level():
+  # Regression target (2026-11-02, found live): a single constant shift (the first pass at this problem)
+  # exactly centers level 0 but does nothing for bigger levels -- by level 6 (2048m) the origin sat at
+  # 98% of the way to a corner, which still visually reads as "basically the corner" even though it's
+  # technically inside the cell. LEVEL_SHIFTS_M's per-level greedy picks guarantee this ratio never
+  # exceeds 50% at any level (the mathematically-proven best possible given the nesting constraint --
+  # see the module docstring's own derivation for why 0% at every level is impossible).
   tp = _make()
   for level in range(tile_placement.MAX_TILE_LEVEL + 1):
     tp.tile_level = level
-    assert tp._cell_index(0.0, 0.0) == (0, 0)
+    size = tile_placement.size_for_level(level)
+    i, j = tp._cell_index(0.0, 0.0)
+    cx, cy = tp._cell_center(i, j)
+    ratio = max(abs(cx), abs(cy)) / (size / 2.0)
+    assert ratio <= 0.5 + 1e-9, f"level {level}: origin at {ratio:.1%} of the way to an edge"
 
 
 def test_coarser_level_boundaries_are_a_subset_of_the_next_finer_level():
   # The nesting property _try_merge_upward()/coarsening depend on: a level-(L+1) cell's rectangle must
   # exactly equal the union of 4 level-L cells, corner-for-corner -- true iff every level-(L+1) boundary
-  # coincides with a level-L boundary. GRID_ORIGIN_SHIFT_M is deliberately the SAME constant at every
-  # level specifically to preserve this when the whole grid was shifted off (0,0)-cornered.
+  # coincides with a level-L boundary. Checking only CONSECUTIVE level pairs is sufficient for every pair
+  # (subset relations compose transitively), which is also how LEVEL_SHIFTS_M itself is built.
   for level in range(tile_placement.MAX_TILE_LEVEL):
     size_l = tile_placement.size_for_level(level)
     size_l1 = tile_placement.size_for_level(level + 1)
-    shift = tile_placement.GRID_ORIGIN_SHIFT_M
+    shift_l = tile_placement.LEVEL_SHIFTS_M[level]
+    shift_l1 = tile_placement.LEVEL_SHIFTS_M[level + 1]
     for k in range(-3, 4):
-      boundary = size_l1 * k - shift
-      m = (boundary + shift) / size_l
+      boundary = size_l1 * k - shift_l1
+      m = (boundary + shift_l) / size_l
       assert abs(m - round(m)) < 1e-9, f"level {level}->{level+1} boundary {boundary} not a subset"
 
 
