@@ -55,8 +55,9 @@
 Isaac Sim (Kit 107+). `pytest` only if you want to run the test suite outside Isaac Sim — `core/` and
 several backend modules are pure-Python/pxr-only and testable without a running sim.
 
-**Build scene** adds a basic light automatically if the stage has none at all — it won't duplicate or
-override a light you (or e.g. Isaac Weather FX) already set up.
+**Build scene** always ensures a basic DomeLight exists, so the scene reads clearly even on a stage with
+no lighting set up. It's added alongside anything else already lighting the stage (your own lights,
+Isaac Sim's own default stage lighting, Isaac Weather FX's sky) rather than replacing them.
 
 ---
 

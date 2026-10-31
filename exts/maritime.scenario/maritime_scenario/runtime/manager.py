@@ -56,30 +56,31 @@ class ScenarioManager:
 
   @classmethod
   def ensure_default_light(cls, stage):
-    """Adds a plain DomeLight at DEFAULT_LIGHT_PATH if the stage has no light at all yet (2026-11-04,
-    user's own call: a brand-new/empty stage has nothing lighting it, so the whole scene -- water, boats,
-    the fallback placeholder box -- renders invisible, which reads as "the extension is broken" rather
-    than "the stage is unlit"). DomeLight (even ambient light from every direction) rather than
-    DistantLight (a single directional sun, tried first -- would leave some sides of a boat dark
-    depending on its heading) so the scene reads clearly from any angle without needing to also think
-    about sun direction.
+    """Unconditionally ensures a DomeLight exists at DEFAULT_LIGHT_PATH -- creating it if missing,
+    replacing it if something else is there (2026-11-04).
 
-    If DEFAULT_LIGHT_PATH exists but ISN'T a DomeLight, it's a stale light from an earlier version of
-    this function (found live, 2026-11-04: switching DistantLight -> DomeLight in code did nothing for a
-    stage that already had the old DistantLight sitting at this exact path from a previous "Build scene"
-    -- the "does ANY light exist" check below saw it and skipped, forever) -- removed and replaced rather
-    than left behind. Any OTHER light (a different path, e.g. one the user added themselves, or
-    isaac-weather-fx's own sun/moon/sky) is left completely alone; this project deliberately leaves full
-    sky/lighting control to that extension, this is only a minimal fallback for when neither it nor the
-    user has set anything up. Called BEFORE WaveBackend.setup_async()'s save-as-stage+reopen restart,
-    specifically so the light survives that save and isn't lost."""
-    from pxr import Usd, UsdLux
-    existing_default = stage.GetPrimAtPath(cls.DEFAULT_LIGHT_PATH)
-    if existing_default and existing_default.GetTypeName() != "DomeLight":
+    This used to scan the WHOLE stage for any existing UsdLux light at all and skip if it found one, on
+    the theory that it shouldn't fight a light the user (or isaac-weather-fx) already set up. That logic
+    is what caused two real, confusing rounds of "it's still a DistantLight": (1) a stale DistantLight
+    this very function had created at this same path under an earlier version just kept re-satisfying its
+    own "any light exists" check forever, and (2) once that was fixed, it turned out Isaac Sim's own
+    default/template stage ships an "Environment" Xform with its OWN stock DistantLight already in it --
+    completely unrelated to anything this extension does, at a different path entirely -- which the scan
+    also counted as "a light already exists" and skipped over. There is no reliable way to tell "a
+    throwaway template light nobody chose" apart from "a deliberate one" by scanning the stage, so this
+    stopped trying: it now only ever looks at (and owns) its own single well-known path, regardless of
+    what else is in the stage. A DomeLight added alongside Isaac Sim's own default template light, or
+    alongside isaac-weather-fx's own sky, just adds more ambient light on top -- brighter, not broken; if
+    that ever needs tuning (e.g. lower intensity while isaac-weather-fx is active), that's a separate,
+    deliberate decision to make later, not something to guess at here. Called BEFORE
+    WaveBackend.setup_async()'s save-as-stage+reopen restart, specifically so the light survives that
+    save and isn't lost."""
+    from pxr import UsdLux
+    existing = stage.GetPrimAtPath(cls.DEFAULT_LIGHT_PATH)
+    if existing and existing.GetTypeName() == "DomeLight":
+      return
+    if existing:
       stage.RemovePrim(cls.DEFAULT_LIGHT_PATH)
-    for prim in Usd.PrimRange(stage.GetPseudoRoot()):
-      if prim.HasAPI(UsdLux.LightAPI):
-        return
     light = UsdLux.DomeLight.Define(stage, cls.DEFAULT_LIGHT_PATH)
     light.CreateIntensityAttr(1000.0)
     log.info("maritime_scenario: no light found in the stage -- added a default DomeLight")
