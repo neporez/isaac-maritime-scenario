@@ -4,8 +4,8 @@ title = "Maritime Scenario"
 description = "Maritime scenario building for Isaac Sim: waves, a controllable own ship, and other-vessel traffic, with a UI panel and a Python API."
 category = "Simulation"
 keywords = ["maritime", "boat", "wave", "scenario", "synthetic data", "isaac sim"]
-authors = ["<your name>"]
-repository = "https://github.com/<you>/isaac-maritime-scenario"
+authors = ["neporez"]
+repository = "https://github.com/neporez/isaac-maritime-scenario"
 readme = "docs/README.md"
 changelog = "docs/CHANGELOG.md"
 
