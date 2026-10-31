@@ -31,32 +31,47 @@ class ScenarioWindow:
     with self._window.frame:
       with ui.ScrollingFrame(vertical_scrollbar_policy=ui.ScrollBarPolicy.SCROLLBAR_ALWAYS_ON,
                               horizontal_scrollbar_policy=ui.ScrollBarPolicy.SCROLLBAR_ALWAYS_OFF):
-        with ui.VStack(spacing=8, style={"margin": 10}):
+        with ui.VStack(spacing=6, style={"margin": 10}):
+          # Setup/status/Build stays a plain always-visible bar (not collapsible) -- it's the mandatory
+          # first action, same role Weather FX's own top Preset/Apply row plays outside its own
+          # collapsible sections. Everything below is a CollapsableFrame (2026-10-31, user's own
+          # request: the old flat list of full sections meant scrolling past everything just to reach
+          # one slider -- collapsed-by-default sections for anything not part of the two-step "set up
+          # water, then spawn ships" workflow keep the default view short and scannable, matching
+          # Weather FX's own per-category layout).
           self._build_setup_section()
-          ui.Spacer(height=14)
-          self._build_wave_section()
-          ui.Spacer(height=14)
-          self._build_wave_tiles_section()
-          ui.Spacer(height=14)
-          self._build_own_ship_section()
-          ui.Spacer(height=14)
-          self._build_ship_physics_section()
-          ui.Spacer(height=14)
-          self._build_vessel_section()
-          ui.Spacer(height=14)
-          self._build_save_load_section()
+          ui.Spacer(height=10)
+          with ui.CollapsableFrame("Gerstner Wave", height=0, collapsed=False):
+            with ui.VStack(spacing=8, style={"margin": 6}):
+              self._build_wave_section()
+          with ui.CollapsableFrame("Water Tiles (advanced)", height=0, collapsed=True):
+            with ui.VStack(spacing=8, style={"margin": 6}):
+              self._build_wave_tiles_section()
+          with ui.CollapsableFrame("Own Ship", height=0, collapsed=False):
+            with ui.VStack(spacing=8, style={"margin": 6}):
+              self._build_own_ship_section()
+          with ui.CollapsableFrame("Ship Physics", height=0, collapsed=True):
+            with ui.VStack(spacing=8, style={"margin": 6}):
+              self._build_ship_physics_section()
+          with ui.CollapsableFrame("Vessels", height=0, collapsed=False):
+            with ui.VStack(spacing=8, style={"margin": 6}):
+              self._build_vessel_section()
+          with ui.CollapsableFrame("Save / Load Scenario", height=0, collapsed=True):
+            with ui.VStack(spacing=8, style={"margin": 6}):
+              self._build_save_load_section()
 
   # ------------------------------------------------------------ Build / status
   def _build_setup_section(self):
     ui.Label("Setup", height=24, alignment=ui.Alignment.CENTER, style={"font_size": 16})
     self._status_label = ui.Label(self._status_text(), height=18, word_wrap=True,
                                    style={"color": 0xFFFFCC66})
-    ui.Button("Build scene (wave + own ship + vessel pool)", height=32, clicked_fn=self._on_build_clicked)
+    ui.Button("Build scene (wave infrastructure + empty vessel pool)", height=32, clicked_fn=self._on_build_clicked)
     ui.Label("Sets up the wave INFRASTRUCTURE (physics-ready sea state + the salt_water material, which "
-             "needs a stage save+reopen to take effect -- expect a short pause) and spawns the own ship "
-             "+ an empty vessel pool -- but places NO visible water yet. Run this once, then pick a water "
-             "layout below (\"Build default wave plane\" for the classic single plane, or \"Place tiles "
-             "with mouse\" for the grid), then press Play.", height=64, word_wrap=True,
+             "needs a stage save+reopen to take effect -- expect a short pause) and an empty vessel pool "
+             "-- but spawns NO own ship and places NO visible water yet. Run this once, then: (1) pick a "
+             "water layout in Gerstner Wave below (\"Build default wave plane\" for the classic single "
+             "plane, or \"Place tiles with mouse\" for the grid); (2) pick a mesh in Own Ship below and "
+             "click \"Apply to own ship\" to actually spawn it; then press Play.", height=76, word_wrap=True,
              style={"color": 0xFF888888})
 
   def _status_text(self):
@@ -92,7 +107,6 @@ class ScenarioWindow:
 
   # ------------------------------------------------------------ Wave
   def _build_wave_section(self):
-    ui.Label("Gerstner Wave", height=26, alignment=ui.Alignment.CENTER, style={"font_size": 16})
     wave = self._sc.state.wave
     self._wave_slider("Amplitude (m):", "amplitude_m", 0.0, 5.0, wave.amplitude_m)
     self._wave_slider("Wavelength (m):", "wavelength_m", 1.0, 60.0, wave.wavelength_m, fmt="{:.1f}")
@@ -140,8 +154,6 @@ class ScenarioWindow:
 
   # ------------------------------------------------------------ Wave tiles (advanced, optional)
   def _build_wave_tiles_section(self):
-    ui.Label("Water Tiles (advanced -- lay extra tiles with the mouse)", height=32,
-             alignment=ui.Alignment.CENTER, style={"font_size": 16}, word_wrap=True)
     ui.Label("Independent of the single Size/Resolution sliders above. Tile size is restricted to "
              "powers of 2 so placing a bigger tile over smaller ones automatically replaces them "
              "(\"coarsening\") -- placing a smaller tile where a bigger one already sits is blocked "
@@ -200,7 +212,6 @@ class ScenarioWindow:
 
   # ------------------------------------------------------------ Own ship
   def _build_own_ship_section(self):
-    ui.Label("Own Ship", height=26, alignment=ui.Alignment.CENTER, style={"font_size": 16})
     labels = [label for label, _ in self._mesh_choices] or ["(press Build scene first)"]
     self._own_ship_mesh_combo = ui.ComboBox(0, *labels, height=24)
 
@@ -211,14 +222,16 @@ class ScenarioWindow:
       _, mesh_id = self._mesh_choices[idx]
       self._sc.set_own_ship_mesh(mesh_id)
 
-    ui.Button("Apply to own ship", height=28, clicked_fn=_apply)
+    ui.Label("No own ship exists until you pick a mesh and click Apply -- this is also how you swap "
+             "meshes later.", height=16, word_wrap=True, style={"color": 0xFF888888})
+    ui.Button("Apply to own ship (spawns it the first time)", height=28, clicked_fn=_apply)
     ui.Label("I/J/K/L = forward/left/back/right while held (not WASD -- those are Isaac Sim's own "
              "viewport camera shortcuts).", height=32, word_wrap=True, style={"color": 0xFF888888})
 
   # ------------------------------------------------------------ Ship physics
   def _build_ship_physics_section(self):
-    ui.Label("Ship Physics (applies to the own ship AND every vessel)", height=32,
-             alignment=ui.Alignment.CENTER, style={"font_size": 16}, word_wrap=True)
+    ui.Label("Applies to the own ship AND every vessel.", height=16, word_wrap=True,
+             style={"color": 0xFF888888})
     sp = self._sc.state.ship_physics
     self._physics_slider("Draft / beam ratio (T/B):", "draft_to_beam_ratio", 0.05, 1.0, sp.draft_to_beam_ratio)
     self._physics_slider("Waterplane coeff:", "waterplane_coeff", 0.3, 1.0, sp.waterplane_coeff)
@@ -245,7 +258,6 @@ class ScenarioWindow:
 
   # ------------------------------------------------------------ Vessels
   def _build_vessel_section(self):
-    ui.Label("Vessels", height=26, alignment=ui.Alignment.CENTER, style={"font_size": 16})
     labels = [label for label, _ in self._mesh_choices] or ["(press Build scene first)"]
     behaviors = ["forward", "backward", "turn_left", "turn_right", "stationary", "follow_path"]
 
@@ -383,7 +395,6 @@ class ScenarioWindow:
 
   # ------------------------------------------------------------ Save / load
   def _build_save_load_section(self):
-    ui.Label("Save / load scenario", height=26, alignment=ui.Alignment.CENTER, style={"font_size": 16})
     self._filename_field = ui.StringField(height=24)
     self._filename_field.model.set_value("scenario1.json")
     with ui.HStack(spacing=6):

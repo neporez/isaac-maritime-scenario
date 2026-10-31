@@ -586,6 +586,36 @@ it against while writing") -- same caveat still applies here: the ray-unprojecti
 are tested against real `Gf.Matrix4d`/in-memory-USD-stage cases, but the live carb.input/viewport EVENT
 WIRING itself has not been exercised against a running Kit process.
 
+**"Build scene" no longer auto-spawns the own ship; collapsible sections for scannability
+(2026-10-31, user's own call, prepping the GitHub readme/guide writeup).** Two related UI changes:
+
+- `ShipBackend.build()` used to call `self.set_mesh(self._default_mesh_id)` immediately -- so the very
+  first thing "Build scene" did was drop a default-mesh ship into the air (before any water layout even
+  existed, before Play). Confusing as a first impression, and backwards for the two-step workflow the
+  upcoming asset guide documents (1: set up the Gerstner wave/water layout, 2: spawn the own ship +
+  vessels + build out the scenario). `build()` now only starts the update/keyboard subscriptions;
+  `set_mesh()` (still the same method, still what the UI's "Own Ship" panel and
+  `ScenarioController.set_own_ship_mesh()` call) is what actually spawns it, the first time it's called.
+  `ShipBackend.__init__`'s now-unused `default_mesh_id` param was removed rather than left dead. Every
+  per-frame/position method already guarded on `self._measured`/`self._params` being `None`
+  (`get_position()`, `_on_update()`, `reset()`), so a not-yet-spawned ship is simply inert, not broken --
+  confirmed by re-running the full suite (still 102 passing; no backend-level test exercises
+  `ShipBackend.build()` itself, since it's pxr-dependent, same standing caveat as the rest of `ship.py`).
+- `ui/window.py`'s flat list of full-height sections (Setup, Gerstner Wave, Water Tiles, Own Ship, Ship
+  Physics, Vessels, Save/Load) meant scrolling past everything just to reach one slider -- compared
+  directly against another installed extension's Weather FX panel, which keeps each category compact
+  (one-line collapsed header + a ▼ to expand) so the whole panel reads as a table of contents at a
+  glance. Every section except the top Setup/status/Build bar (which stays a plain always-visible bar,
+  same role Weather FX's own top Preset/Apply row plays) is now wrapped in an `omni.ui.CollapsableFrame`.
+  Collapsed by default: Water Tiles (already labeled "advanced"), Ship Physics (fine-tuning, not needed
+  immediately), Save/Load (occasional use). Expanded by default: Gerstner Wave, Own Ship, Vessels -- the
+  three sections the two-step workflow above actually walks through in one session. Each section's old
+  centered `ui.Label(title, font_size=16)` header was removed (the CollapsableFrame supplies its own
+  title now); Ship Physics' explanatory aside ("applies to the own ship AND every vessel") moved from
+  that removed title into a small gray body label instead of being lost. NOT yet confirmed live (same
+  standing caveat as the rest of this UI) whether `CollapsableFrame` renders/collapses the way this
+  assumes in this project's actual Kit/Isaac Sim version.
+
 ## Current status (as of 2026-10-30)
 
 Everything above is built: `core/` + `backends/wave.py`'s tile registry (102 passing tests total),

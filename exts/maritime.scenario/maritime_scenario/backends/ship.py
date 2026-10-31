@@ -34,9 +34,8 @@ KEY_TURN_FRACTION = 0.01   # fraction of max_torque_nm, same as the original's K
 class ShipBackend(Backend):
   name = "ship"
 
-  def __init__(self, default_mesh_id="boat1"):
+  def __init__(self):
     self.mesh_id = None
-    self._default_mesh_id = default_mesh_id
     self._measured = None
     self._params = None   # core.ship_motion.ShipPhysicsParams, for the CURRENT mesh
     self._prev = {"z": None, "roll": None, "pitch": None}
@@ -47,7 +46,15 @@ class ShipBackend(Backend):
 
   # ------------------------------------------------------------ Backend interface
   def build(self):
-    self.set_mesh(self._default_mesh_id)
+    """Deliberately does NOT spawn any mesh (2026-10-31, user's own call): "Build scene" used to drop a
+    default-mesh own ship into the air immediately, before any water layout even existed -- confusing as
+    the very first thing a new user sees, and backwards for the intended workflow of (1) set up the wave/
+    water layout, THEN (2) spawn the own ship + vessels. set_mesh() (below) is what actually spawns the
+    ship now, called from the UI's "Own Ship" panel ("Apply to own ship") or the API
+    (ScenarioController.set_own_ship_mesh()) -- build() only starts the update/keyboard subscriptions so
+    those are ready the moment a mesh IS set. Every per-frame/position method already guards on
+    self._measured/self._params being None (get_position(), _on_update(), reset()), so a ship that hasn't
+    been spawned yet is simply inert, not broken."""
     self._start_update()
     self._start_keyboard()
 
