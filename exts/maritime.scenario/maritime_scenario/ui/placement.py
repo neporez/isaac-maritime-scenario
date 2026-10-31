@@ -115,19 +115,33 @@ class PlacementController:
     if stage.GetPrimAtPath(GHOST_PATH):
       stage.RemovePrim(GHOST_PATH)
     ghost = stage.DefinePrim(GHOST_PATH, "Xform")
-    visual = stage.DefinePrim(GHOST_PATH + "/visual", "Xform")
-    visual.GetReferences().AddReference(measured.usd_path)
-    for prim in Usd.PrimRange(ghost):
-      if prim.IsA(UsdGeom.Mesh):
-        UsdGeom.Mesh(prim).GetNormalsAttr().Block()   # see backends/meshes.py's strip_bad_normals()
-    scale, rot_x = measured.scale, measured.rot_x_deg
-    lcx, lcy, lcz = measured.local_center
-    xform = UsdGeom.Xformable(visual)
-    xform.ClearXformOpOrder()
-    xform.AddTranslateOp(UsdGeom.XformOp.PrecisionDouble).Set(Gf.Vec3d(-scale * lcx, -scale * lcy, -scale * lcz))
-    xform.AddScaleOp(UsdGeom.XformOp.PrecisionDouble).Set(Gf.Vec3d(scale, scale, scale))
-    if rot_x != 0.0:
-      xform.AddRotateXOp(UsdGeom.XformOp.PrecisionFloat, opSuffix="unitsResolve").Set(float(rot_x))
+    visual_path = GHOST_PATH + "/visual"
+    if not measured.usd_path:
+      # No real asset registered (measured came from backends.meshes.fallback_measured()) -- same plain
+      # scaled Cube backends.meshes.build_visual() uses for the real spawn, added as its own branch here
+      # rather than folded into the reference path below (found live, 2026-11-03: AddReference("") left
+      # the ghost empty/invisible for this case). The reference branch below is unchanged -- this
+      # module's own docstring calls it "proven in practice... not something to improve on blind", so
+      # this fix is additive, not a restructure of that path.
+      cube_prim = stage.DefinePrim(visual_path, "Cube")
+      UsdGeom.Cube(cube_prim).CreateSizeAttr(1.0)
+      xform = UsdGeom.Xformable(cube_prim)
+      xform.ClearXformOpOrder()
+      xform.AddScaleOp(UsdGeom.XformOp.PrecisionDouble).Set(Gf.Vec3d(measured.dx, measured.dy, measured.dz))
+    else:
+      visual = stage.DefinePrim(visual_path, "Xform")
+      visual.GetReferences().AddReference(measured.usd_path)
+      for prim in Usd.PrimRange(ghost):
+        if prim.IsA(UsdGeom.Mesh):
+          UsdGeom.Mesh(prim).GetNormalsAttr().Block()   # see backends/meshes.py's strip_bad_normals()
+      scale, rot_x = measured.scale, measured.rot_x_deg
+      lcx, lcy, lcz = measured.local_center
+      xform = UsdGeom.Xformable(visual)
+      xform.ClearXformOpOrder()
+      xform.AddTranslateOp(UsdGeom.XformOp.PrecisionDouble).Set(Gf.Vec3d(-scale * lcx, -scale * lcy, -scale * lcz))
+      xform.AddScaleOp(UsdGeom.XformOp.PrecisionDouble).Set(Gf.Vec3d(scale, scale, scale))
+      if rot_x != 0.0:
+        xform.AddRotateXOp(UsdGeom.XformOp.PrecisionFloat, opSuffix="unitsResolve").Set(float(rot_x))
     ghost_material = self._get_ghost_material(stage)
     for prim in Usd.PrimRange(ghost):
       if prim.IsA(UsdGeom.Gprim):

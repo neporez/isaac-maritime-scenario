@@ -969,9 +969,24 @@ to be doable for real, same session (2026-11-02).**
   some earlier point outside this conversation) -- no way to inspect 3D file content from here to confirm
   that directly.
 
+**The mouse-placement ghost preview never showed up for the fallback box (2026-11-03).** User, live:
+"일단 default 박스의 고스트는 안나오는 문제가 있네". Root cause: `ui/placement.py`'s `_ensure_ghost()`
+unconditionally did `visual.GetReferences().AddReference(measured.usd_path)` -- for the fallback box
+(`measured.usd_path == ""`), that leaves the ghost's visual prim with no geometry at all, so "Place with
+mouse" showed nothing even though the actual spawn (`backends/meshes.py`'s `build_visual()`, fixed
+2026-10-31) already handled this case correctly. This module's own docstring calls its mouse/ghost code
+"proven in practice... not something to improve on blind" (ported from a version debugged purely against
+a real running Isaac Sim this port couldn't re-verify against), so the fix is a NEW, clearly-separated
+branch for the fallback case (builds the same scaled `Cube` `build_visual()` does) rather than folding it
+into or restructuring the existing reference branch, which is untouched. First committed tests for this
+module at all: `tests/test_placement_ghost.py` (new -- same `sys.modules` stubbing approach as
+`tests/test_tile_placement_grid.py`, plus a working fake `omni.usd.get_context().get_stage()` since
+`_ensure_ghost()` actually builds prims on it, unlike `tile_placement.py`'s pure-math methods). 136 tests
+total now.
+
 ## Current status (as of 2026-10-30)
 
-Everything above is built: `core/` + `backends/wave.py`'s tile registry (133 passing tests total),
+Everything above is built: `core/` + `backends/wave.py`'s tile registry (136 passing tests total),
 `runtime/manager.py`, all three backends, `api.py`, `extension.py`, `ui/window.py`, `ui/placement.py`,
 `ui/tile_placement.py`. Verified so far: `core/`'s pure-Python logic (real pytest, including a regression
 test for the model-path portability bug and the wave-tiling phase-consistency math), every file
