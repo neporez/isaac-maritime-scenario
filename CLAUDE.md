@@ -942,9 +942,36 @@ originally built against) -- the actual `.usd` file itself is NOT bundled in the
 every other model), this is just the attribution text required by the license, next to where the
 screenshots that used it will appear.
 
+**The boundary wall stopped the hull's ORIGIN, not its edge; the screenshot-only mesh folder turned out
+to be doable for real, same session (2026-11-02).**
+- User, live: "근데 아마 선박의 중앙점까지 넘어가야 막히는 느낌인데" -- the wall held fine, but the bow/side
+  visibly poked past it before anything stopped the boat, because `clamp_to_bounds()` only ever clamped
+  the body's ORIGIN point, with no allowance for the hull's own size. Added a `margin` parameter (hull's
+  own half-diagonal, `math.hypot(dx, dy) / 2.0` -- the exact worst-case origin-to-corner distance at ANY
+  heading, computed at each call site in `ship.py`/`vessels.py` since `clamp_to_bounds()` itself stays
+  pure/heading-agnostic) that insets the usable area before clamping, so the HULL's edge is what stops at
+  the wall. Falls back to clamping at the midpoint (not an inverted/broken range) if a hull turns out
+  bigger than the available space. New tests in `tests/test_ship_motion.py` cover both the margin itself
+  and that degenerate fallback. 133 tests total now.
+- Separately, this sandbox turned out to NOT be disconnected from the user's real dev machine after all
+  -- `~/.bashrc` already exports `MARITIME_SCENARIO_MESH_DIR=/home/rain/boat_model`, and that directory
+  genuinely has all 13 web-sourced boat files on disk (confirmed: `boat1.usd` is real, 5.9MB). This
+  matters for the previous round's "symlink setup, but I can't do it since this sandbox has no model
+  files" note -- that was wrong, the files exist on this exact machine via that env var, just not inside
+  the isaac-maritime-scenario repo itself (correctly, since they're not meant to be bundled/committed --
+  see `core/meshes.py`'s own docstring). So this round's screenshot-only setup was actually carried out,
+  not just described: created `assets/screenshot_boat/` (gitignored, a new `.gitignore` entry -- this
+  folder is a personal convenience, never meant to be shared/committed) containing one symlink,
+  `boat1.usd -> /home/rain/boat_model/boat1.usd`, and repointed `~/.bashrc`'s `MARITIME_SCENARIO_MESH_DIR`
+  at this new folder instead of the full 13-boat one, so the mesh picker only offers this one boat once a
+  new terminal picks up the change. Took the user's word that `/home/rain/boat_model/boat1.usd` is
+  actually the CC-BY-4.0 survey boat the Credits section attributes (presumably swapped in locally at
+  some earlier point outside this conversation) -- no way to inspect 3D file content from here to confirm
+  that directly.
+
 ## Current status (as of 2026-10-30)
 
-Everything above is built: `core/` + `backends/wave.py`'s tile registry (131 passing tests total),
+Everything above is built: `core/` + `backends/wave.py`'s tile registry (133 passing tests total),
 `runtime/manager.py`, all three backends, `api.py`, `extension.py`, `ui/window.py`, `ui/placement.py`,
 `ui/tile_placement.py`. Verified so far: `core/`'s pure-Python logic (real pytest, including a regression
 test for the model-path portability bug and the wave-tiling phase-consistency math), every file

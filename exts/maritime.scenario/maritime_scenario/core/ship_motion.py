@@ -153,16 +153,33 @@ def clamp_vector_length(vx, vy, vz, max_length):
   return vx * scale, vy * scale, vz * scale
 
 
-def clamp_to_bounds(x, y, bounds, fallback_area):
+def clamp_to_bounds(x, y, bounds, fallback_area, margin=0.0):
   """Clamps (x, y) to `bounds` (min_x, max_x, min_y, max_y) if given, else to the square
   [-fallback_area, fallback_area] on both axes -- the shared "invisible wall" math both ship.py's and
   vessels.py's per-frame updates use (2026-11-02) so a boat can't sail past the edge of the actual placed
   water (WaveBackend.get_bounds()), falling back to the separate general.area_m square only while no
-  water tile is placed at all yet."""
+  water tile is placed at all yet.
+
+  `margin` (2026-11-02, found live: "선박의 중앙점까지 넘어가야 막히는 느낌" -- it looked like only the
+  hull's ORIGIN had to cross the wall, letting the bow/side already poke through first) insets the usable
+  area by this much on every side before clamping (x, y) themselves, so it's the HULL's edge that stops
+  at the wall, not its origin point. Callers pass the hull's own half-diagonal
+  (`math.hypot(dx, dy) / 2.0`) -- the exact worst-case distance from origin to the farthest corner at ANY
+  yaw, so the whole footprint stays inside the wall regardless of heading (a tighter, heading-aware
+  margin would let the origin get closer when the hull happens to be bow-on to the wall, but needs the
+  current yaw at every call site; this is the simpler, always-safe choice). If `margin` leaves no usable
+  area at all (a hull bigger than the available space), clamps to the midpoint instead of an inverted
+  (min > max) range."""
   if bounds is not None:
     min_x, max_x, min_y, max_y = bounds
   else:
     min_x, max_x, min_y, max_y = -fallback_area, fallback_area, -fallback_area, fallback_area
+  min_x, max_x = min_x + margin, max_x - margin
+  min_y, max_y = min_y + margin, max_y - margin
+  if min_x > max_x:
+    min_x = max_x = (min_x + max_x) / 2.0
+  if min_y > max_y:
+    min_y = max_y = (min_y + max_y) / 2.0
   return max(min_x, min(max_x, x)), max(min_y, min(max_y, y))
 
 

@@ -4,6 +4,11 @@ assets/models/*.usda
 assets/models/*.usdc
 assets/models/*.usdz
 
+# Local-only screenshot-taking mesh folder (a symlink to one real boat.usd elsewhere on disk, set via
+# MARITIME_SCENARIO_MESH_DIR in ~/.bashrc) -- not meant to be shared/committed, just a personal
+# convenience so the mesh picker only offers one, properly-licensed boat while taking doc screenshots.
+assets/screenshot_boat/
+
 # Python
 __pycache__/
 *.pyc

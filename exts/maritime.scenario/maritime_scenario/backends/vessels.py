@@ -351,7 +351,8 @@ class VesselsBackend(Backend):
       if not self._boundary_enabled:
         continue
       area = self.context.manager.state_ref.general.area_m
-      clamped_x, clamped_y = ship_motion.clamp_to_bounds(pos[0], pos[1], wave_backend.get_bounds(), area)
+      margin = math.hypot(live.measured.dx, live.measured.dy) / 2.0   # hull half-diagonal -- see clamp_to_bounds()
+      clamped_x, clamped_y = ship_motion.clamp_to_bounds(pos[0], pos[1], wave_backend.get_bounds(), area, margin)
       if clamped_x != pos[0] or clamped_y != pos[1]:
         # Invisible wall, not a teleport (2026-11-02, replacing the old wraparound -- user, live: "그냥
         # 벽에 박아서 이동못하는 듯한 연출처럼", a boat that's run into the edge should look stuck there,
@@ -364,6 +365,8 @@ class VesselsBackend(Backend):
         # huge z/roll/pitch-rate spike) keeps heave/roll/pitch continuous -- the hull still bobs on the
         # wave normally, it just can't progress past the edge. Thrust keeps being applied into the wall
         # every frame (untouched above), which is what gives the "straining against it, pushed from
-        # behind" look rather than a clean stop.
+        # behind" look rather than a clean stop. `margin` (the hull's own half-diagonal) stops the HULL's
+        # edge at the wall, not its origin point -- without it, the bow/side could already poke past the
+        # wall before anything stopped it (found live: "선박의 중앙점까지 넘어가야 막히는 느낌").
         yaw_deg = world_tf.ExtractRotation().Decompose(Gf.Vec3d(1, 0, 0), Gf.Vec3d(0, 1, 0), Gf.Vec3d(0, 0, 1))[2]
         self._set_xform(body, clamped_x, clamped_y, pos[2], yaw_deg)

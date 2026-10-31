@@ -334,7 +334,8 @@ class ShipBackend(Backend):
 
     if self._boundary_enabled:
       area = self.context.manager.state_ref.general.area_m
-      clamped_x, clamped_y = ship_motion.clamp_to_bounds(pos[0], pos[1], wave_backend.get_bounds(), area)
+      margin = math.hypot(self._measured.dx, self._measured.dy) / 2.0   # hull half-diagonal -- see clamp_to_bounds()
+      clamped_x, clamped_y = ship_motion.clamp_to_bounds(pos[0], pos[1], wave_backend.get_bounds(), area, margin)
       if clamped_x != pos[0] or clamped_y != pos[1]:
         # Invisible wall at the edge of the actual placed water, not a teleport -- same mechanism and
         # reasoning as vessels.py's own boundary (2026-11-02, user's own call: "자선도 나는 막히기를

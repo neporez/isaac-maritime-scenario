@@ -148,3 +148,19 @@ def test_clamp_to_bounds_holds_position_at_the_edge_of_given_bounds():
 def test_clamp_to_bounds_falls_back_to_a_square_when_bounds_is_none():
   assert ship_motion.clamp_to_bounds(10.0, 10.0, None, fallback_area=50.0) == (10.0, 10.0)
   assert ship_motion.clamp_to_bounds(1000.0, -1000.0, None, fallback_area=50.0) == (50.0, -50.0)
+
+
+def test_clamp_to_bounds_margin_stops_the_hulls_edge_not_its_origin():
+  # Regression target (2026-11-02, found live): "선박의 중앙점까지 넘어가야 막히는 느낌" -- with no
+  # margin, the body's ORIGIN had to reach the wall before clamping kicked in, letting the bow/side
+  # already poke past it. A margin equal to the hull's half-diagonal keeps the origin that much further
+  # inside the wall, so the whole footprint (at any heading) stays within bounds.
+  bounds = (-50.0, 50.0, -50.0, 50.0)
+  x, y = ship_motion.clamp_to_bounds(48.0, 0.0, bounds, fallback_area=200.0, margin=10.0)
+  assert x == 40.0 and y == 0.0   # held 10m short of the wall, not at it
+
+
+def test_clamp_to_bounds_margin_falls_back_to_midpoint_when_hull_is_bigger_than_the_area():
+  bounds = (-5.0, 5.0, -5.0, 5.0)
+  x, y = ship_motion.clamp_to_bounds(0.0, 0.0, bounds, fallback_area=200.0, margin=20.0)
+  assert x == 0.0 and y == 0.0   # midpoint of [-5,5] -- no crash, no inverted range
