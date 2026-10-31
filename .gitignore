@@ -30,3 +30,8 @@ Thumbs.db
 # Local env/secrets, never committed
 .env
 .env.*
+
+# Working notes for AI-assisted development sessions -- kept locally, not published (2026-11-04, user's
+# own call: it grew too long/dense across many sessions to be a good public-facing document, even though
+# it was tracked and pushed for a while before this). The README no longer claims or links to it.
+CLAUDE.md

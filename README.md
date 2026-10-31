@@ -63,7 +63,6 @@ several backend modules are pure-Python/pxr-only and testable without a running 
 |---|---|
 | [**Water & Waves**](docs/water-and-waves.md) | Gerstner wave settings, placing water tiles, the LOD/auto-merge system |
 | [**Boat Assets & Scenarios**](assets/models/README.md) | Registering a boat model, how buoyancy is computed, every way to spawn a boat |
-| [**Engineering log**](CLAUDE.md) | Every design decision, measured number, and live bug found along the way |
 
 ---
 
@@ -87,10 +86,7 @@ docs/          screenshot-driven usage guides
 
 This project was built in close collaboration with [Claude Code](https://claude.com/claude-code) —
 design discussions, implementation, debugging, and the test suite were all developed together across many
-sessions. Commits are attributed accordingly (`Co-Authored-By: Claude`). [`CLAUDE.md`](CLAUDE.md) is the
-actual working log from that process: hypotheses stated before testing them, live bugs found and fixed,
-and the reasoning behind each design choice — published as-is rather than cleaned up, since that process
-is as much a part of this project as the code it produced.
+sessions. Commits are attributed accordingly (`Co-Authored-By: Claude`).
 
 ---
 
