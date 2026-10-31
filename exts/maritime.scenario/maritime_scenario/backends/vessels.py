@@ -25,7 +25,7 @@ from . import meshes as mesh_backend
 log = logging.getLogger("maritime_scenario")
 
 ROOT_PATH = "/World/Vessels"
-AREA_M = 200.0            # fallback spawn/wrap half-extent if general.area_m isn't set yet
+AREA_M = 200.0            # fallback spawn/boundary half-extent if general.area_m isn't set yet
 PLACEMENT_TRIES = 50
 LINEAR_DAMPING = 0.8
 
@@ -43,7 +43,7 @@ class VesselsBackend(Backend):
     self._live = []
     self._next_idx = 0
     self._update_sub = None
-    self._wraparound_enabled = True
+    self._boundary_enabled = True
 
   # ------------------------------------------------------------ Backend interface
   def build(self):
@@ -160,9 +160,9 @@ class VesselsBackend(Backend):
       ))
     return out
 
-  def set_wraparound_enabled(self, flag):
-    self._wraparound_enabled = bool(flag)
-    log.info("maritime_scenario(vessels): wraparound %s", "enabled" if flag else "disabled")
+  def set_boundary_enabled(self, flag):
+    self._boundary_enabled = bool(flag)
+    log.info("maritime_scenario(vessels): area boundary %s", "enabled" if flag else "disabled")
 
   def set_all_speed(self, linear=None, angular=None):
     for live in self._live:
@@ -348,15 +348,19 @@ class VesselsBackend(Backend):
       PhysxSchema.PhysxForceAPI(body).GetForceAttr().Set(Gf.Vec3f(fx, fy, fz))
       PhysxSchema.PhysxForceAPI(body).GetTorqueAttr().Set(Gf.Vec3f(tx, ty, tz))
 
-      if not self._wraparound_enabled:
+      if not self._boundary_enabled:
         continue
       area = self.context.manager.state_ref.general.area_m
-      new_x, new_y, wrapped = pos[0], pos[1], False
-      if pos[0] > area: new_x, wrapped = pos[0] - 2 * area, True
-      elif pos[0] < -area: new_x, wrapped = pos[0] + 2 * area, True
-      if pos[1] > area: new_y, wrapped = pos[1] - 2 * area, True
-      elif pos[1] < -area: new_y, wrapped = pos[1] + 2 * area, True
-      if wrapped:
+      clamped_x = max(-area, min(area, pos[0]))
+      clamped_y = max(-area, min(area, pos[1]))
+      if clamped_x != pos[0] or clamped_y != pos[1]:
+        # Invisible wall, not a teleport (2026-11-02, replacing the old wraparound -- user, live: "그냥
+        # 벽에 박아서 이동못하는 듯한 연출처럼", a boat that's run into the edge should look stuck there,
+        # not jump to the far side). Holding x/y at the boundary while leaving prev_z/prev_roll/prev_pitch
+        # untouched (unlike the old wraparound's reset, which was needed there specifically because
+        # teleporting a long distance would otherwise read back as a bogus huge z/roll/pitch-rate spike)
+        # keeps heave/roll/pitch continuous -- the hull still bobs on the wave normally, it just can't
+        # progress past the edge. Thrust keeps being applied into the wall every frame (untouched above),
+        # which is what gives the "straining against it, pushed from behind" look rather than a clean stop.
         yaw_deg = world_tf.ExtractRotation().Decompose(Gf.Vec3d(1, 0, 0), Gf.Vec3d(0, 1, 0), Gf.Vec3d(0, 0, 1))[2]
-        self._set_xform(body, new_x, new_y, pos[2], yaw_deg)
-        live.prev_z = live.prev_roll = live.prev_pitch = None
+        self._set_xform(body, clamped_x, clamped_y, pos[2], yaw_deg)

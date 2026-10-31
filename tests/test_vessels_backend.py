@@ -1,6 +1,9 @@
-"""VesselsBackend._random_spawn_point()/_water_tiles() -- pure Python, no pxr touched (backends/
-vessels.py only imports pxr/omni inside the methods that need them, same convention as backends/wave.py,
-so this doesn't need the carb/omni stubbing ui/tile_placement.py's tests do)."""
+"""VesselsBackend._random_spawn_point()/_water_tiles()/set_boundary_enabled() -- pure Python, no pxr
+touched (backends/vessels.py only imports pxr/omni inside the methods that need them, same convention as
+backends/wave.py, so this doesn't need the carb/omni stubbing ui/tile_placement.py's tests do). The
+actual x/y clamping-at-the-boundary logic lives inline in _on_update(), which needs a real PhysX-enabled
+USD stage to exercise meaningfully -- not covered here, same standing caveat as the rest of this
+project's per-frame physics code."""
 import types
 
 from maritime_scenario.backends import vessels as vessels_backend
@@ -79,3 +82,12 @@ def test_random_spawn_point_weights_tile_choice_by_area_not_count():
       big_hits += 1
   ratio = big_hits / n
   assert ratio > 0.9   # expected ~99%, generous margin for randomness
+
+
+def test_boundary_enabled_defaults_true_and_is_toggleable():
+  backend = vessels_backend.VesselsBackend()
+  assert backend._boundary_enabled is True
+  backend.set_boundary_enabled(False)
+  assert backend._boundary_enabled is False
+  backend.set_boundary_enabled(True)
+  assert backend._boundary_enabled is True

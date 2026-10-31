@@ -20,7 +20,7 @@ SCHEMA_VERSION = 1
 
 @dataclass(frozen=True)
 class GeneralParams:
-  area_m: float = 200.0   # spawn/wrap half-extent -- matches the wave's own size/2 by convention
+  area_m: float = 200.0   # spawn/boundary half-extent -- matches the wave's own size/2 by convention
 
 
 SECTION_TYPES = {

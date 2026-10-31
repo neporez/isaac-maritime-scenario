@@ -538,8 +538,9 @@ UsdPreviewSurface graph.
   placement, any `Vessel.behavior`) both build on the same prim-spawning path, per-frame physics +
   behavior motion (`forward`/`backward`/`turn_left`/`turn_right`/`stationary`/`follow_path`, the last via
   `core.ship_motion.path_steer`), OBB collision-aware placement (`core.placement`, from
-  `other_boats.py`), and wraparound-at-the-area-edge (on by default, `set_wraparound_enabled(False)` to
-  disable, same as the original).
+  `other_boats.py`), and an invisible wall at the area edge (on by default, `set_boundary_enabled(False)`
+  to disable -- originally teleported a vessel to the opposite edge instead, replaced 2026-11-02, see
+  the dedicated note below).
 
 **Roll/pitch target: 4 hull-fixed probes, not a single point under the center (2026-10-30).** The
 original design (`float_mesh_test.py`/`other_boats.py`, ported verbatim at first) sampled the water's
@@ -862,9 +863,42 @@ unaffected -- it already takes an explicit (x, y) from the caller, there's nothi
 New `tests/test_vessels_backend.py` (no carb/omni stubbing needed -- `backends/vessels.py`, like
 `backends/wave.py`, already only imports pxr/omni inside the methods that need them). 124 tests total now.
 
+**Vessel area edge is now an invisible wall, not a teleport (2026-11-02).** User, live: a vessel
+drifting past `general.area_m` used to jump to the opposite edge; wanted it to instead look like it ran
+into something solid and got stuck there -- "웨이브의 끝에 다가가면 보이지 않는 벽에 가로막힌것처럼 더이상
+지나갈수 없도록", "뒤에서는 밀리는것 같은데 그냥 벽에 박아서 이동못하는 듯한 연출처럼" (looks pushed from
+behind, but visually just stuck against a wall). `_on_update()`'s old wraparound block (`pos[0] > area ->
+pos[0] - 2*area`, teleporting to the far side) replaced with clamping `x`/`y` to `[-area, area]` each
+frame instead -- same position-override mechanism (`_set_xform()`), just clamp instead of wrap. Crucially
+does NOT reset `prev_z`/`prev_roll`/`prev_pitch` the way the old wraparound did: that reset existed
+specifically because a large instantaneous teleport would otherwise read back next frame as a bogus huge
+heave/roll/pitch-RATE spike (computed from `(new - prev) / dt`); clamping only ever moves the body a tiny
+amount back to the boundary, so heave/roll/pitch stay continuous -- the hull keeps bobbing on the wave
+normally while stuck at the edge. Thrust/torque are computed and applied BEFORE this clamp and are left
+untouched, so a `forward`-behavior vessel keeps trying to push forward into the wall every frame, which is
+what produces the "straining against it" look the user asked for, rather than a clean stop.
+
+Renamed throughout for honesty, since the new behavior doesn't wrap anything: `_wraparound_enabled` ->
+`_boundary_enabled`, `set_wraparound_enabled()` -> `set_boundary_enabled()`,
+`ScenarioController.set_vessel_wraparound()` -> `set_vessel_area_boundary()` (this project is still
+pre-release/single-consumer, so renaming a rarely-used API method outright was judged better than leaving
+a name that actively describes the OLD, now-wrong behavior). `general.area_m`'s own comment updated from
+"spawn/wrap half-extent" to "spawn/boundary half-extent" to match.
+
+Scope note: this only touches `VesselsBackend` (other-vessel traffic) -- the OWN ship (`ship.py`) has NO
+area-boundary logic at all right now, wall or wraparound, and was never reported as teleporting (only
+vessels showed that symptom), so it was left alone rather than assumed to need the same treatment. Worth
+asking about explicitly if the own ship should get a matching wall, since right now it can sail past
+`general.area_m` indefinitely with no boundary of any kind.
+
+**Not yet verified live** (no running Isaac Sim) whether the clamp-without-resetting-prev-state actually
+produces a smooth "stuck at the wall, still bobbing" look rather than any visible jitter -- the physics
+reasoning holds analytically, but this is exactly the kind of per-frame interaction this project's other
+notes repeatedly flag as needing a real session to confirm.
+
 ## Current status (as of 2026-10-30)
 
-Everything above is built: `core/` + `backends/wave.py`'s tile registry (124 passing tests total),
+Everything above is built: `core/` + `backends/wave.py`'s tile registry (125 passing tests total),
 `runtime/manager.py`, all three backends, `api.py`, `extension.py`, `ui/window.py`, `ui/placement.py`,
 `ui/tile_placement.py`. Verified so far: `core/`'s pure-Python logic (real pytest, including a regression
 test for the model-path portability bug and the wave-tiling phase-consistency math), every file

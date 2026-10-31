@@ -133,10 +133,13 @@ class ScenarioController:
   def clear_vessels(self) -> None:
     self._manager.clear_vessels()
 
-  def set_vessel_wraparound(self, enabled: bool) -> None:
+  def set_vessel_area_boundary(self, enabled: bool) -> None:
+    """When enabled (the default), a vessel reaching +/- general.area_m in x or y is held there -- an
+    invisible wall, not a teleport (renamed from set_vessel_wraparound(), 2026-11-02: it used to
+    teleport a vessel to the opposite edge instead)."""
     backend = self._manager.get_backend("vessels")
     if backend is not None:
-      backend.set_wraparound_enabled(enabled)
+      backend.set_boundary_enabled(enabled)
 
   def set_vessel_speed(self, linear=None, angular=None) -> None:
     """Bulk-overwrites every CURRENT vessel's speed -- for spawn-time-only per-vessel control, pass
