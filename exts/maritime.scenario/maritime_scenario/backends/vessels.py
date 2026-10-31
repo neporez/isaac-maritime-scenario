@@ -78,15 +78,14 @@ class VesselsBackend(Backend):
 
     all_meshes = mesh_backend.list_all()   # never empty -- falls back to a placeholder box (see its own docstring)
 
-    area = self.context.manager.state_ref.general.area_m
+    tiles = self._water_tiles()
     placed_obbs = []
     n_crowded = 0
     for _ in range(n):
       measured = random.choice(all_meshes)
       x = y = yaw_deg = 0.0
       for _try in range(PLACEMENT_TRIES):
-        x = random.uniform(-area, area)
-        y = random.uniform(-area, area)
+        x, y = self._random_spawn_point(tiles)
         yaw_deg = random.uniform(0.0, 360.0)
         candidate = (x, y, measured.dx, measured.dy, math.radians(yaw_deg))
         if not any(placement.obb_overlap(candidate, other) for other in placed_obbs):
@@ -101,6 +100,26 @@ class VesselsBackend(Backend):
     if n_crowded:
       msg += f" -- {n_crowded} couldn't find a collision-free spot after {PLACEMENT_TRIES} tries, placed anyway"
     log.info(msg)
+
+  def _water_tiles(self):
+    wave_backend = self.context.manager.get_backend("wave")
+    return list(wave_backend.list_tiles().values()) if wave_backend is not None else []
+
+  def _random_spawn_point(self, tiles):
+    """Uniform-random (x, y) within one of the currently PLACED water tiles, area-weighted so a tile
+    isn't picked as often as a much smaller one just because there's one of each (2026-11-02, user's own
+    call: random swarm spawning used to sample a fixed `general.area_m` square independent of where
+    water actually is -- fine back when water was always one classic plane covering that whole square,
+    but with tile-based water the placed footprint can be smaller, bigger, or a totally different shape,
+    so a boat could land on dry land). Falls back to the old fixed-square sampling if no water tile is
+    placed at all yet -- still better than refusing to spawn anything."""
+    if not tiles:
+      area = self.context.manager.state_ref.general.area_m
+      return random.uniform(-area, area), random.uniform(-area, area)
+    tile = random.choices(tiles, weights=[t.size_m ** 2 for t in tiles])[0]
+    half = tile.size_m / 2.0
+    return (random.uniform(tile.center_x - half, tile.center_x + half),
+            random.uniform(tile.center_y - half, tile.center_y + half))
 
   def spawn(self, vessel: Vessel):
     """Adds exactly ONE vessel on top of whatever's already in the scene -- never clears ROOT_PATH."""

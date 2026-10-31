@@ -97,7 +97,9 @@ behavior (`forward` / `backward` / `turn_left` / `turn_right` / `stationary` / `
 **"Place with mouse"** (click a point on the water to spawn there, or for `follow_path`, click multiple
 points — the first is the spawn point, the rest become waypoints, then click **"Finish Path"**), or type a
 position directly and click **"Spawn vessel (typed position)"**. The **"Random swarm count"** field +
-**"Set"** button replaces everything in the scene with N randomly-placed vessels at once.
+**"Set"** button replaces everything in the scene with N randomly-placed vessels at once, sampled from
+inside whatever water tiles are actually placed (area-weighted across tiles if there's more than one) —
+not a fixed square, so vessels won't land outside the water you've actually built.
 
 ![Spawning a boat from the UI panel](images/spawn-ui.png)
 

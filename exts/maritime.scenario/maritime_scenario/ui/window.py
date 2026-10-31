@@ -54,26 +54,26 @@ class ScenarioWindow:
     with self._window.frame:
       with ui.ScrollingFrame(vertical_scrollbar_policy=ui.ScrollBarPolicy.SCROLLBAR_ALWAYS_ON,
                               horizontal_scrollbar_policy=ui.ScrollBarPolicy.SCROLLBAR_ALWAYS_OFF):
-        with ui.VStack(spacing=0, style={"margin": 10}):
+        with ui.VStack(spacing=3, style={"margin": 10}):
           self._build_setup_section()
           ui.Spacer(height=10)
           with ui.CollapsableFrame("Water Tiles", height=0, collapsed=False):
-            with ui.VStack(spacing=0, style={"margin": 6}):
+            with ui.VStack(spacing=3, style={"margin": 6}):
               self._build_wave_tiles_section()
           with ui.CollapsableFrame("Own Ship", height=0, collapsed=False):
-            with ui.VStack(spacing=0, style={"margin": 6}):
+            with ui.VStack(spacing=3, style={"margin": 6}):
               self._build_own_ship_section()
           with ui.CollapsableFrame("Vessels", height=0, collapsed=False):
-            with ui.VStack(spacing=0, style={"margin": 6}):
+            with ui.VStack(spacing=3, style={"margin": 6}):
               self._build_vessel_section()
           with ui.CollapsableFrame("Ship Physics", height=0, collapsed=True):
-            with ui.VStack(spacing=0, style={"margin": 6}):
+            with ui.VStack(spacing=3, style={"margin": 6}):
               self._build_ship_physics_section()
           with ui.CollapsableFrame("Gerstner Wave", height=0, collapsed=False):
-            with ui.VStack(spacing=0, style={"margin": 6}):
+            with ui.VStack(spacing=3, style={"margin": 6}):
               self._build_wave_section()
           with ui.CollapsableFrame("Save / Load Scenario", height=0, collapsed=True):
-            with ui.VStack(spacing=0, style={"margin": 6}):
+            with ui.VStack(spacing=3, style={"margin": 6}):
               self._build_save_load_section()
 
   # ------------------------------------------------------------ Build / status / assets folder

@@ -834,9 +834,37 @@ reproduces after reload (2026-11-02).**
   widget's own style (`ui.IntSlider`/`ui.ComboBox`/etc.) rather than their containers, since container-
   level `spacing`/`margin` are now both at zero.
 
+**Confirmed: the `style={"margin": 0}` HStack fix actually worked live (2026-11-02).** Rows went from
+visibly gapped to "완전히 딱붙어서" (completely stuck together) -- zero gap confirmed, not just assumed.
+User wants a LITTLE breathing room back, not zero. Every section-body `VStack`'s `spacing` (and the
+outer one holding Setup + all the `CollapsableFrame`s) went from `0` to `3` -- the per-row `HStack`
+margin stays at `0` (that's what fixed the real bug); `spacing=3` on the `VStack` is the normal,
+supported way to add a small gap BETWEEN rows without reopening whatever per-widget-type default margin
+caused the original problem.
+
+**Random vessel swarm now spawns within actual placed water tiles, not a fixed square
+(2026-11-02).** `VesselsBackend.set_count()` sampled `x, y` uniformly from `[-general.area_m,
++general.area_m]` (default 200m) regardless of where water actually was -- harmless back when water was
+always one classic plane covering roughly that whole square, but with tile-based water (now the only
+UI-driven way to build water, previous round) the placed footprint can be smaller, bigger, oddly shaped,
+or anywhere, so a random swarm could land boats on dry land. New `_water_tiles()` (reads
+`WaveBackend.list_tiles()` via `ScenarioController.list_water_tiles()`'s own backend) and
+`_random_spawn_point(tiles)`: picks one placed tile AREA-WEIGHTED (`random.choices(..., weights=[size_m**2
+...])`, so a single big tile isn't picked as often as a single small one just because there's one of
+each), then samples uniformly within THAT tile's footprint. Falls back to the old fixed-square sampling
+only if no water tile is placed at all yet, rather than refusing to spawn anything. Deliberately reads
+ALL placed tiles (`list_tiles()`), not just the distance-based-LOD-active subset
+(`WaveBackend.tile_active`) -- the LOD subset is a performance optimization tied to the own ship's
+current position (and undefined before a ship exists), not a statement about where water exists; using
+it here would make random spawning behave differently depending on ship position/existence, which isn't
+what "don't spawn on dry land" is actually asking for. `spawn()` (exact-position vessel placement) is
+unaffected -- it already takes an explicit (x, y) from the caller, there's nothing "random" to constrain.
+New `tests/test_vessels_backend.py` (no carb/omni stubbing needed -- `backends/vessels.py`, like
+`backends/wave.py`, already only imports pxr/omni inside the methods that need them). 124 tests total now.
+
 ## Current status (as of 2026-10-30)
 
-Everything above is built: `core/` + `backends/wave.py`'s tile registry (119 passing tests total),
+Everything above is built: `core/` + `backends/wave.py`'s tile registry (124 passing tests total),
 `runtime/manager.py`, all three backends, `api.py`, `extension.py`, `ui/window.py`, `ui/placement.py`,
 `ui/tile_placement.py`. Verified so far: `core/`'s pure-Python logic (real pytest, including a regression
 test for the model-path portability bug and the wave-tiling phase-consistency math), every file
