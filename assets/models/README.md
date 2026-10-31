@@ -84,8 +84,6 @@ model — naval-architecture style, not a simple 4-corner spring rig — impleme
   coefficients are tunable (`sc.set_ship_physics(...)`) but are rule-of-thumb defaults, not validated
   figures for any specific real hull.
 
-![Buoyancy: a boat riding the wave surface](images/buoyancy-demo.png)
-
 ## 3. Spawning a boat
 
 ### Via the UI
