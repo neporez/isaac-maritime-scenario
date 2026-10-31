@@ -18,8 +18,6 @@ log = logging.getLogger("maritime_scenario")
 
 
 class ScenarioManager:
-  DEFAULT_LIGHT_PATH = "/World/DefaultLight"   # see ensure_default_light()'s own docstring
-
   def __init__(self):
     self._state = ScenarioState()
     self._backends = {}
@@ -39,8 +37,6 @@ class ScenarioManager:
     from ..backends.vessels import VesselsBackend
     from ..backends.wave import WaveBackend
 
-    self.ensure_default_light(self.context.stage())
-
     if "wave" not in self._backends:
       self.register_backend(WaveBackend())
     await self.get_backend("wave").setup_async()
@@ -53,37 +49,6 @@ class ScenarioManager:
     self.get_backend("vessels").build()
     self.ready = True
     log.info("maritime_scenario: setup complete -- press Play")
-
-  @classmethod
-  def ensure_default_light(cls, stage):
-    """Unconditionally ensures a DomeLight exists at DEFAULT_LIGHT_PATH -- creating it if missing,
-    replacing it if something else is there (2026-11-04).
-
-    This used to scan the WHOLE stage for any existing UsdLux light at all and skip if it found one, on
-    the theory that it shouldn't fight a light the user (or isaac-weather-fx) already set up. That logic
-    is what caused two real, confusing rounds of "it's still a DistantLight": (1) a stale DistantLight
-    this very function had created at this same path under an earlier version just kept re-satisfying its
-    own "any light exists" check forever, and (2) once that was fixed, it turned out Isaac Sim's own
-    default/template stage ships an "Environment" Xform with its OWN stock DistantLight already in it --
-    completely unrelated to anything this extension does, at a different path entirely -- which the scan
-    also counted as "a light already exists" and skipped over. There is no reliable way to tell "a
-    throwaway template light nobody chose" apart from "a deliberate one" by scanning the stage, so this
-    stopped trying: it now only ever looks at (and owns) its own single well-known path, regardless of
-    what else is in the stage. A DomeLight added alongside Isaac Sim's own default template light, or
-    alongside isaac-weather-fx's own sky, just adds more ambient light on top -- brighter, not broken; if
-    that ever needs tuning (e.g. lower intensity while isaac-weather-fx is active), that's a separate,
-    deliberate decision to make later, not something to guess at here. Called BEFORE
-    WaveBackend.setup_async()'s save-as-stage+reopen restart, specifically so the light survives that
-    save and isn't lost."""
-    from pxr import UsdLux
-    existing = stage.GetPrimAtPath(cls.DEFAULT_LIGHT_PATH)
-    if existing and existing.GetTypeName() == "DomeLight":
-      return
-    if existing:
-      stage.RemovePrim(cls.DEFAULT_LIGHT_PATH)
-    light = UsdLux.DomeLight.Define(stage, cls.DEFAULT_LIGHT_PATH)
-    light.CreateIntensityAttr(1000.0)
-    log.info("maritime_scenario: no light found in the stage -- added a default DomeLight")
 
   # ------------------------------------------------------------ state
   @property

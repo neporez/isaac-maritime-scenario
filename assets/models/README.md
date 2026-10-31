@@ -34,8 +34,6 @@ it (own ship or a vessel) shows a warning in the status line ("no boat assets fo
 drops a physically-simulated box onto the water, so you can test buoyancy/behavior/scenario layout before
 any real art asset exists. See `backends/meshes.py`'s `build_visual()`/`fallback_measured()`.
 
-![A placeholder box spawned with no assets folder set](images/fallback-box.png)
-
 ### Registering a real model
 
 [`core/meshes.py`](../../exts/maritime.scenario/maritime_scenario/core/meshes.py) is a plain data registry
