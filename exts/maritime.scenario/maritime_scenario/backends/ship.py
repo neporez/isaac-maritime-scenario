@@ -1,13 +1,15 @@
 """The controllable own ship -- ported from boat_mesh_pipeline/06_scenario_editor/float_mesh_test.py,
 web meshes only (that file could also float this project's own private "ours" usd_out meshes; this
 extension doesn't carry that pool at all -- see core/meshes.py's own docstring). All the heave/roll/
-pitch spring-damper math lives in core.ship_motion; this module is the pxr plumbing + keyboard control
-around it.
+pitch spring-damper math lives in core.ship_motion; this module is the pxr plumbing around it.
 
-I/J/K/L control forward/back/left/right, NOT WASD or the arrow keys -- both of those are Isaac Sim's
-own default viewport fly-camera shortcuts and never reach this subscription (confirmed in
-06_scenario_editor, 2026-10-21: WASD controls were dead; switched to I/J/K/L, which nothing in Isaac
-Sim's default viewport binds).
+Movement is driven by set_control(name, pressed) -- name in "forward"/"back"/"left"/"right" -- called
+from the UI's on-screen directional buttons (ui/window.py's _make_hold_button()) or
+ScenarioController.ship_control(). A `carb.input` keyboard subscription (I/J/K/L) was tried here
+(2026-11-01) but confirmed live NOT to actually move the ship (2026-11-04) and was removed rather than
+left in as dead/misleading code -- see CLAUDE.md for the history. Re-adding real keyboard control is
+still open; whatever replaces this should be verified live before being documented as working, unlike
+the removed attempt.
 """
 import logging
 import math
@@ -61,7 +63,6 @@ class ShipBackend(Backend):
     # own comment for the full mechanism; same default-on convention as VesselsBackend._boundary_enabled.
     self._boundary_enabled = True
     self._update_sub = None
-    self._keyboard_sub = None
 
   # ------------------------------------------------------------ Backend interface
   def build(self):
@@ -70,23 +71,20 @@ class ShipBackend(Backend):
     the very first thing a new user sees, and backwards for the intended workflow of (1) set up the wave/
     water layout, THEN (2) spawn the own ship + vessels. set_mesh() (below) is what actually spawns the
     ship now, called from the UI's "Own Ship" panel ("Apply to own ship") or the API
-    (ScenarioController.set_own_ship_mesh()) -- build() only starts the update/keyboard subscriptions so
-    those are ready the moment a mesh IS set. Every per-frame/position method already guards on
-    self._measured/self._params being None (get_position(), _on_update(), reset()), so a ship that hasn't
-    been spawned yet is simply inert, not broken."""
+    (ScenarioController.set_own_ship_mesh()) -- build() only starts the update subscription so it's ready
+    the moment a mesh IS set. Every per-frame/position method already guards on self._measured/
+    self._params being None (get_position(), _on_update(), reset()), so a ship that hasn't been spawned
+    yet is simply inert, not broken."""
     self._start_update()
-    self._start_keyboard()
 
   def apply_state(self, state, changed):
     if "ship_physics" in changed and self._measured is not None:
       self._recompute_physics(state.ship_physics)
 
   def detach(self):
-    for attr in ("_update_sub", "_keyboard_sub"):
-      sub = getattr(self, attr)
-      if sub is not None:
-        del sub
-        setattr(self, attr, None)
+    if self._update_sub is not None:
+      del self._update_sub
+      self._update_sub = None
 
   # ------------------------------------------------------------ mesh / physics
   def set_mesh(self, mesh_id):
@@ -193,7 +191,7 @@ class ShipBackend(Backend):
       self._controls[name] = bool(pressed)
 
   def set_thrust(self, newtons):
-    """Steady cruise thrust along the hull's own +x (bow) axis, on top of any held forward/back key."""
+    """Steady cruise thrust along the hull's own +x (bow) axis, on top of any held forward/back button."""
     self._thrust_n = float(newtons)
 
   def set_speed(self, linear=None, angular=None):
@@ -237,32 +235,6 @@ class ShipBackend(Backend):
     import omni.kit.app
     if self._update_sub is None:
       self._update_sub = omni.kit.app.get_app().get_update_event_stream().create_subscription_to_pop(self._on_update)
-
-  def _start_keyboard(self):
-    import carb.input
-    import omni.appwindow
-    if self._keyboard_sub is not None:
-      return
-    key_to_control = {
-      carb.input.KeyboardInput.I: "forward",
-      carb.input.KeyboardInput.K: "back",
-      carb.input.KeyboardInput.J: "left",
-      carb.input.KeyboardInput.L: "right",
-    }
-
-    def _on_keyboard(e):
-      name = key_to_control.get(e.input)
-      if name is None:
-        return True
-      if e.type == carb.input.KeyboardEventType.KEY_PRESS:
-        self.set_control(name, True)
-      elif e.type == carb.input.KeyboardEventType.KEY_RELEASE:
-        self.set_control(name, False)
-      return True   # don't consume -- let the viewport's own camera keys etc. still work
-
-    appwindow = omni.appwindow.get_default_app_window()
-    self._keyboard_sub = carb.input.acquire_input_interface().subscribe_to_keyboard_events(
-      appwindow.get_keyboard(), _on_keyboard)
 
   def _on_update(self, e):
     timeline = self.context.timeline()

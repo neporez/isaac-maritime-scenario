@@ -78,7 +78,8 @@ class ScenarioController:
     return self._manager.get_own_ship_mesh_id()
 
   def ship_control(self, name: str, pressed: bool) -> None:
-    """name: "forward"/"back"/"left"/"right" -- same as a held I/J/K/L key."""
+    """name: "forward"/"back"/"left"/"right", held for as long as pressed=True -- what the UI's on-screen
+    directional buttons call while held down. No keyboard binding exists for this currently."""
     backend = self._manager.get_backend("ship")
     if backend is not None:
       backend.set_control(name, pressed)

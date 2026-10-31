@@ -277,22 +277,19 @@ class ScenarioWindow:
 
     with ui.HStack(spacing=0, style={"margin": 0}):
       ui.Spacer(width=70)
-      self._make_hold_button("Forward (I)", "forward", width=100)
+      self._make_hold_button("Forward", "forward", width=100)
       ui.Spacer(width=70)
     with ui.HStack(spacing=0, style={"margin": 0}):
-      self._make_hold_button("Left (J)", "left", width=70)
-      self._make_hold_button("Back (K)", "back", width=100)
-      self._make_hold_button("Right (L)", "right", width=70)
-    ui.Label("Keyboard: I/J/K/L also works -- click into the 3D viewport first (not this panel).",
-             height=16, word_wrap=True, style={"color": 0xFF888888})
+      self._make_hold_button("Left", "left", width=70)
+      self._make_hold_button("Back", "back", width=100)
+      self._make_hold_button("Right", "right", width=70)
 
   def _make_hold_button(self, label, control_name, width=80):
     """A button that drives ScenarioController.ship_control(control_name, pressed) for as long as it's
-    held down -- the UI-button equivalent of holding one of the I/J/K/L keys (backends/ship.py's
-    ShipBackend._controls), not a single discrete nudge. NOT yet confirmed live (same standing caveat as
-    every other Kit-API-dependent piece of this UI) whether set_mouse_pressed_fn/set_mouse_released_fn's
-    (x, y, button, modifier) callback signature is exactly right for this project's installed Kit
-    version -- button index 0 is treated as the primary/left mouse button."""
+    held down (backends/ship.py's ShipBackend._controls), not a single discrete nudge -- currently the
+    ONLY way to move the own ship: a keyboard binding (I/J/K/L) was tried and removed (2026-11-04) after
+    being confirmed live NOT to actually work, see backends/ship.py's own module docstring. button index
+    0 is treated as the primary/left mouse button."""
     btn = ui.Button(label, height=28, width=width)
 
     def _pressed(x, y, button, modifier):

@@ -984,6 +984,36 @@ module at all: `tests/test_placement_ghost.py` (new -- same `sys.modules` stubbi
 `_ensure_ghost()` actually builds prims on it, unlike `tile_placement.py`'s pure-math methods). 136 tests
 total now.
 
+**I/J/K/L keyboard control removed -- confirmed live not to work; README split into multiple
+screenshot-driven pages (2026-11-04).**
+- User, live: "생각해보니까 ijkl로 움직이는거 안되는데" -- the `carb.input` keyboard subscription added
+  2026-11-01 (and never independently verified live, flagged as such every time it came up) was tried and
+  confirmed NOT to actually move the own ship. Rather than leave it in as dead/misleading code, it was
+  removed outright: `ShipBackend._start_keyboard()`/`_keyboard_sub`/the `_on_keyboard` callback are gone,
+  `build()` only starts the update subscription now, and `detach()` no longer loops over a keyboard sub
+  that doesn't exist. `set_control()`/`self._controls` and the on-screen directional buttons
+  (`ui/window.py`'s `_make_hold_button()`, wired to `ScenarioController.ship_control()`) are UNCHANGED and
+  remain the only way to move the own ship -- those were never reported as broken, only the keyboard path
+  was. Button labels lost their now-wrong "(I)"/"(J)"/"(K)"/"(L)" key hints; every doc mention of
+  keyboard control (this file, `README.md`, `assets/models/README.md`, `api.py`'s/`ship.py`'s own
+  docstrings) was corrected to say movement is currently button-only. If keyboard control is revisited,
+  it needs to be confirmed live before being documented as working again -- this is the second piece of
+  Kit-input-dependent code in this project found broken only after shipping it undocumented-as-uncertain
+  (the first being `tile_placement.py`'s/`placement.py`'s mouse-event quirks, which WERE each hard-won and
+  verified live in the original port this project is based on -- the difference is this keyboard binding
+  was NEW code, written here, never actually run).
+- User feedback on the just-published `README.md`: drop the "Why this exists" framing section entirely
+  (kept the rest), word the extension-search-path step exactly as the user phrased it after checking the
+  real UI (`Window → Extensions → ☰ → Settings → Extension Search Paths, add <repo>/exts` -- replacing a
+  guessed "gear icon" description), and drop the Python API code snippet rather than leave a sample that
+  undersells how much of `api.py` it doesn't show. "Quick start" was removed too, replaced by a short
+  **How to use** section that just points at two guides instead of re-explaining steps already covered
+  elsewhere: a NEW `docs/water-and-waves.md` (Gerstner wave sliders + water-tile placement, screenshot-
+  driven, mirroring `assets/models/README.md`'s own style) and the existing `assets/models/README.md`
+  (boat registration + spawning + scenario setup, already screenshot-driven). `extension.toml`'s
+  `authors`/`repository` placeholders (`<your name>`/`<you>`) were also filled in (`neporez` / the real
+  repo URL) as part of actually publishing this.
+
 ## Current status (as of 2026-10-30)
 
 Everything above is built: `core/` + `backends/wave.py`'s tile registry (136 passing tests total),

@@ -16,7 +16,7 @@ buoyancy, and autonomous vessel traffic — driven from a UI panel or a Python A
   far past where any one tile would be practical alone.
 - **Own ship** — naval-architecture-style heave/roll/pitch (a damped oscillator per axis, not a simple
   4-corner spring rig), with mass/stiffness/inertia *derived* from the hull's own measured size, not
-  hand-picked per boat. Drive it with I/J/K/L (or the matching on-screen buttons), set its spawn
+  hand-picked per boat. Drive it with the on-screen Forward/Left/Back/Right buttons, set its spawn
   position/speed, swap its mesh live.
 - **Vessel traffic** — spawn a random collision-free swarm, or place vessels one at a time (by mouse,
   typed position, or a waypoint path), with `forward`/`backward`/`turn_left`/`turn_right`/`stationary`/
@@ -49,38 +49,19 @@ buoyancy, and autonomous vessel traffic — driven from a UI panel or a Python A
    ```bash
    git clone https://github.com/neporez/isaac-maritime-scenario.git
    ```
-2. In Isaac Sim, open **Window → Extensions**, click the gear icon, and add
-   `isaac-maritime-scenario/exts` to the extension search paths.
+2. In Isaac Sim: **Window → Extensions → ☰ → Settings → Extension Search Paths**, add
+   `<repo>/exts` (the path to this cloned repo's `exts` folder).
 3. Find **"Maritime Scenario"** in the extension list and enable it. The panel opens automatically
    (`open_window_on_startup`).
 
-## Quick start
+## How to use
 
-1. **Build scene** — sets up the wave infrastructure and an empty vessel pool. This does *not* place any
-   visible water or spawn an own ship by itself.
-2. **Water Tiles** — click "Place tiles with mouse" and click in the viewport to lay down water around
-   where you want to work.
-3. **Own Ship** — pick a mesh, optionally set a spawn X/Y/Z, and click "Apply to own ship" to spawn it.
-4. **Vessels** — use "Random swarm count" for a quick AI-driven crowd, or "Place with mouse" /
-   typed-position spawning for exact placement and waypoint paths.
-5. Press **Play**. Drive the own ship with I/J/K/L (click into the 3D viewport first).
-
-No boat models of your own yet? Every step above still works — see
-[`assets/models/README.md`](assets/models/README.md) for how the placeholder-box fallback works and how
-to register real assets once you have them.
-
-### Python API
-
-```python
-from maritime_scenario import api as scenario
-
-sc = scenario.get_controller()
-await sc.setup_async()                 # wave infrastructure + empty vessel pool -- once per session
-sc.set_wave(amplitude_m=1.2)
-sc.set_own_ship_mesh("boat3")          # spawns the own ship
-sc.spawn_vessel("boat1", x=50, y=20, behavior="forward")
-sc.set_vessel_count(10)                # or: a random collision-free swarm of 10
-```
+1. Click **Build scene** to set up the wave infrastructure and an empty vessel pool. This does *not*
+   place any visible water or spawn an own ship by itself.
+2. Set the sea state and lay down water — see [Water & Waves](docs/water-and-waves.md).
+3. Register boat assets (or just use the built-in placeholder box) and spawn an own ship + vessels — see
+   [`assets/models/README.md`](assets/models/README.md).
+4. Press **Play**.
 
 ## Project structure
 
@@ -93,6 +74,7 @@ exts/maritime.scenario/maritime_scenario/
   api.py       the public Python API (the UI panel uses exactly this, nothing more)
 tests/         pytest suite for everything that doesn't require a running Isaac Sim
 assets/models/ where you put your own boat assets (not bundled -- see its own README)
+docs/          screenshot-driven usage guides (water & waves; boat assets/scenarios live in assets/models/)
 ```
 
 For the full engineering log — every design decision, measured number, live bug, and why things are built
