@@ -28,6 +28,14 @@ BEHAVIORS = ["forward", "backward", "turn_left", "turn_right", "stationary", "fo
 NO_ASSETS_WARNING = ("WARNING: no boat assets folder set (or it's empty) -- spawning a placeholder box "
                       "instead. Use \"Choose folder...\" above to set one.")
 
+# Base resolution slider (2026-10-31, user's own call): shown as clean powers of 2 (8/16/32/64) even
+# though the real resolution passed to TilePlacementController is displayed+1 (9/17/33/65) -- odd counts
+# are what resolution_for_level()'s "(base-1)*2**level + 1" formula needs to land exactly on a shared
+# vertex at every tile boundary (see its own docstring), so the UI shows the tidy number but still drives
+# the real one underneath. Index 1 (displayed 16 / real 17) is the default, matching
+# tile_placement.DEFAULT_BASE_RESOLUTION.
+BASE_RES_DISPLAY_STEPS = [8, 16, 32, 64]
+
 
 class ScenarioWindow:
   def __init__(self, controller):
@@ -46,37 +54,37 @@ class ScenarioWindow:
     with self._window.frame:
       with ui.ScrollingFrame(vertical_scrollbar_policy=ui.ScrollBarPolicy.SCROLLBAR_ALWAYS_ON,
                               horizontal_scrollbar_policy=ui.ScrollBarPolicy.SCROLLBAR_ALWAYS_OFF):
-        with ui.VStack(spacing=6, style={"margin": 10}):
+        with ui.VStack(spacing=0, style={"margin": 10}):
           self._build_setup_section()
           ui.Spacer(height=10)
           with ui.CollapsableFrame("Water Tiles", height=0, collapsed=False):
-            with ui.VStack(spacing=8, style={"margin": 6}):
+            with ui.VStack(spacing=0, style={"margin": 6}):
               self._build_wave_tiles_section()
           with ui.CollapsableFrame("Own Ship", height=0, collapsed=False):
-            with ui.VStack(spacing=8, style={"margin": 6}):
+            with ui.VStack(spacing=0, style={"margin": 6}):
               self._build_own_ship_section()
           with ui.CollapsableFrame("Vessels", height=0, collapsed=False):
-            with ui.VStack(spacing=8, style={"margin": 6}):
+            with ui.VStack(spacing=0, style={"margin": 6}):
               self._build_vessel_section()
           with ui.CollapsableFrame("Ship Physics", height=0, collapsed=True):
-            with ui.VStack(spacing=8, style={"margin": 6}):
+            with ui.VStack(spacing=0, style={"margin": 6}):
               self._build_ship_physics_section()
           with ui.CollapsableFrame("Gerstner Wave", height=0, collapsed=False):
-            with ui.VStack(spacing=8, style={"margin": 6}):
+            with ui.VStack(spacing=0, style={"margin": 6}):
               self._build_wave_section()
           with ui.CollapsableFrame("Save / Load Scenario", height=0, collapsed=True):
-            with ui.VStack(spacing=8, style={"margin": 6}):
+            with ui.VStack(spacing=0, style={"margin": 6}):
               self._build_save_load_section()
 
   # ------------------------------------------------------------ Build / status / assets folder
   def _build_setup_section(self):
+    ui.Button("Build scene", height=32, clicked_fn=self._on_build_clicked)
     self._status_label = ui.Label(self._status_text(), height=18, word_wrap=True,
                                    style={"color": 0xFFFFCC66})
     with ui.HStack(spacing=6):
       ui.Label("Boat assets:", width=80)
       self._mesh_dir_label = ui.Label(self._sc.get_mesh_dir() or "(not set)", word_wrap=True)
     ui.Button("Choose folder...", height=26, clicked_fn=self._on_choose_mesh_dir)
-    ui.Button("Build scene", height=32, clicked_fn=self._on_build_clicked)
 
   def _status_text(self):
     return "status: ready" if self._sc.ready else "status: not built yet -- press Build scene"
@@ -191,14 +199,20 @@ class ScenarioWindow:
       _refresh_tile_level_label()
     with ui.HStack(spacing=6):
       ui.Label("Base resolution", width=90)
-      self._tile_resolution_field = ui.IntField(height=24)
-      self._tile_resolution_field.model.set_value(self._tile_placement.base_resolution)
+      self._base_res_slider = ui.IntSlider(min=0, max=len(BASE_RES_DISPLAY_STEPS) - 1, height=20)
+      current_display = self._tile_placement.base_resolution - 1   # real = displayed + 1, see constant
+      initial_idx = (BASE_RES_DISPLAY_STEPS.index(current_display)
+                     if current_display in BASE_RES_DISPLAY_STEPS else 1)
+      self._base_res_slider.model.set_value(initial_idx)
+      self._base_res_label = ui.Label(str(BASE_RES_DISPLAY_STEPS[initial_idx]), width=40)
 
       def _on_base_resolution_changed(m):
-        self._tile_placement.set_base_resolution(m.get_value_as_int())
+        display = BASE_RES_DISPLAY_STEPS[m.get_value_as_int()]
+        self._base_res_label.text = str(display)
+        self._tile_placement.set_base_resolution(display + 1)
         _refresh_tile_level_label()
 
-      self._tile_resolution_field.model.add_value_changed_fn(_on_base_resolution_changed)
+      self._base_res_slider.model.add_value_changed_fn(_on_base_resolution_changed)
     with ui.HStack(spacing=6):
       ui.Button("Place tiles with mouse", height=30, clicked_fn=self._on_place_tile_with_mouse)
       ui.Button("Delete tile with mouse", height=30, clicked_fn=self._on_delete_tile_with_mouse)
@@ -233,6 +247,38 @@ class ScenarioWindow:
       self._status_label.text = NO_ASSETS_WARNING if used_fallback else self._status_text()
 
     ui.Button("Apply to own ship", height=28, clicked_fn=_apply)
+
+    with ui.HStack(spacing=0):
+      ui.Spacer(width=70)
+      self._make_hold_button("Forward (I)", "forward", width=100)
+      ui.Spacer(width=70)
+    with ui.HStack(spacing=0):
+      self._make_hold_button("Left (J)", "left", width=70)
+      self._make_hold_button("Back (K)", "back", width=100)
+      self._make_hold_button("Right (L)", "right", width=70)
+    ui.Label("Keyboard: I/J/K/L also works while this window has focus.", height=16, word_wrap=True,
+             style={"color": 0xFF888888})
+
+  def _make_hold_button(self, label, control_name, width=80):
+    """A button that drives ScenarioController.ship_control(control_name, pressed) for as long as it's
+    held down -- the UI-button equivalent of holding one of the I/J/K/L keys (backends/ship.py's
+    ShipBackend._controls), not a single discrete nudge. NOT yet confirmed live (same standing caveat as
+    every other Kit-API-dependent piece of this UI) whether set_mouse_pressed_fn/set_mouse_released_fn's
+    (x, y, button, modifier) callback signature is exactly right for this project's installed Kit
+    version -- button index 0 is treated as the primary/left mouse button."""
+    btn = ui.Button(label, height=28, width=width)
+
+    def _pressed(x, y, button, modifier):
+      if button == 0:
+        self._sc.ship_control(control_name, True)
+
+    def _released(x, y, button, modifier):
+      if button == 0:
+        self._sc.ship_control(control_name, False)
+
+    btn.set_mouse_pressed_fn(_pressed)
+    btn.set_mouse_released_fn(_released)
+    return btn
 
   # ------------------------------------------------------------ Ship physics
   def _build_ship_physics_section(self):

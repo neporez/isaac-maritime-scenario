@@ -15,13 +15,15 @@ def test_target_draft_clamped_to_hull_height():
 def test_derive_matches_hand_computed_values_for_a_known_hull():
   # Hand-computed from the exact same formulas other_boats.py's _ob_ship_motion_params() used, for a
   # 20m x 5m x 6m hull at default coefficients -- a regression check against the real production math,
-  # not just "does it run".
+  # not just "does it run". draft_to_beam_ratio's default is 0.05 (2026-10-31, lowered from 0.1 -- a
+  # better match for this project's own boats), so this hand-computation uses that current default, not
+  # the ratio hardcoded as a literal.
   coeffs = ship_motion.ShipPhysicsCoeffs()
   params = ship_motion.derive(length_m=20.0, beam_m=5.0, height_m=6.0, coeffs=coeffs)
 
-  draft = min(0.1 * 5.0, 0.8 * 6.0)  # 0.5
+  draft = min(coeffs.draft_to_beam_ratio * 5.0, 0.8 * 6.0)  # 0.25
   waterplane_area = 0.75 * 20.0 * 5.0  # 75.0
-  mass = ship_motion.RHO_WATER * waterplane_area * draft  # 37500.0
+  mass = ship_motion.RHO_WATER * waterplane_area * draft  # 18750.0
   assert math.isclose(params.draft_m, draft)
   assert math.isclose(params.mass_kg, mass)
 

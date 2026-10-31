@@ -679,6 +679,41 @@ folder..." button instead, plus a sane default when no assets exist yet rather t
   `list_all()`'s fallback-when-empty behavior) -- 110 tests total now, all against real pxr (no stubs),
   same pattern as `test_wave_backend_tiles.py`.
 
+**Third pass the same day: tighter spacing, a stepped base-resolution slider, own-ship movement
+buttons, a lower default draft, "Build scene" moved to the top (2026-10-31).**
+- Every section-body `ui.VStack`'s `spacing` dropped from 8 to 0 (plus the outer `VStack` holding
+  Setup+all the `CollapsableFrame`s), so option rows sit directly against each other -- user, after
+  seeing a live screenshot: "옵션들끼리 한칸씩 띄지말고 그냥 바로 다음줄로 오도록 딱 붙혀라" (don't gap
+  options apart, pack them tight). The one deliberate `ui.Spacer(height=10)` between Setup and the first
+  `CollapsableFrame` stays -- that's a section-level break, not an option-level one.
+- `_build_setup_section()`: "Build scene" is now the FIRST widget (was last, after the status label and
+  the boat-assets-folder row) -- user: "맨 위가 build Scene이 되도록 해라".
+- Water Tiles' "Base resolution" control changed from a free-typed `ui.IntField` to a 4-step
+  `ui.IntSlider` (user: raw numbers like "17"/"33" aren't as clean as a slider, and wanted ~4 steps shown
+  as tidy powers of 2 -- "8 16 32 64"). The DISPLAYED values (`BASE_RES_DISPLAY_STEPS = [8, 16, 32, 64]`,
+  `ui/window.py`) are one less than what's actually passed to `TilePlacementController.set_base_resolution()`
+  (9/17/33/65) -- `resolution_for_level()`'s crack-elimination formula needs an ODD base resolution (see
+  its own docstring), so the slider shows the clean number while still driving the real one underneath.
+  Default index 1 (displayed 16 / real 17) matches `tile_placement.DEFAULT_BASE_RESOLUTION` exactly, so
+  the slider's default position reproduces today's default behavior unchanged.
+- `ShipPhysicsCoeffs.draft_to_beam_ratio`'s default lowered from 0.1 to 0.05 (user: a better match for
+  this project's own boats) -- `tests/test_ship_motion.py`'s hand-computed regression test was updated to
+  read the ratio off `coeffs.draft_to_beam_ratio` rather than hardcoding the old `0.1` literal, so it
+  stays correct if this default ever moves again.
+- Own Ship gained a small directional pad -- "Forward (I)" / "Left (J)" / "Back (K)" / "Right (L)"
+  buttons, each wired via `set_mouse_pressed_fn`/`set_mouse_released_fn` to call
+  `ScenarioController.ship_control(name, True/False)` for as long as it's held (the UI-button equivalent
+  of holding the matching keyboard key, not a one-shot nudge), plus a one-line reminder that I/J/K/L
+  itself still works. This was prompted by the user asking to "make movement keys for the own ship,
+  something other than WASD" and to expose the same control as UI buttons -- I/J/K/L (`backends/ship.py`,
+  unchanged) already satisfies "not WASD" and was already fully wired, just no longer visible anywhere in
+  the UI after the previous round stripped its explanatory label; this round re-surfaces it (as a button
+  label, not a paragraph) instead of re-deriving a new key scheme. The turn keys (J/L) are written
+  directly on the Left/Right button labels themselves, satisfying "write the rotation key next to the
+  control" without a separate explanatory line. **NOT yet confirmed live** (same standing caveat as every
+  other Kit-API-dependent piece of this UI) whether `set_mouse_pressed_fn`/`set_mouse_released_fn`'s
+  `(x, y, button, modifier)` callback signature is exactly right for this project's installed Kit version.
+
 ## Current status (as of 2026-10-30)
 
 Everything above is built: `core/` + `backends/wave.py`'s tile registry (110 passing tests total),

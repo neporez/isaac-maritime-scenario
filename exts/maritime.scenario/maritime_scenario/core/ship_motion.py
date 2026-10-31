@@ -35,8 +35,9 @@ class ShipPhysicsCoeffs:
   """Rule-of-thumb naval-architecture coefficients -- tunable, not validated for any specific hull.
   Matches 06_scenario_editor's PHYSICS_COEFFS exactly (same names/defaults/ranges), just grouped into
   one dataclass instead of loose module globals shared across two files by hand."""
-  draft_to_beam_ratio: float = 0.1     # T/B -- typical small-craft range ~0.3-0.45, kept at the
-                                        # project's own validated default of 0.1
+  draft_to_beam_ratio: float = 0.05    # T/B -- typical small-craft range ~0.3-0.45, but lowered to 0.05
+                                        # from the earlier 0.1 default (2026-10-31, user's own call: a
+                                        # better match for this project's own boats)
   waterplane_coeff: float = 0.75       # waterplane area ~= this x length x beam
   gm_coeff: float = 0.15               # transverse metacentric height ~= this x beam
   gml_coeff: float = 0.6               # longitudinal metacentric height ~= this x length (always >> GM)
