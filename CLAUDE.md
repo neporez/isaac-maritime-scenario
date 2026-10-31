@@ -760,9 +760,49 @@ reported not working (2026-11-01).**
   caveat as every other keyboard/mouse-event-dependent piece of this UI**; if none of (a)/(b)/(c) explain
   it, the actual `carb.input`/`omni.appwindow` wiring needs to be debugged live next, not re-guessed here.
 
+**Grid origin shift (fixing a real "always need 4 tiles" live complaint), own ship Linear/Angular +
+X/Y/Z spawn fields, status moved inline, first committed test for tile_placement.py's grid math
+(2026-11-01).**
+- `ui/tile_placement.py`'s mouse-click placement grid was corner-aligned with NO shift at all -- cell
+  (0,0) at every level spanned `[0, size) x [0, size)`, so the world origin (where the own ship always
+  spawns) sat exactly on the corner shared by 4 cells, confirmed live: placing water there always took 4
+  separate clicks. Fixed with a new `GRID_ORIGIN_SHIFT_M = BASE_TILE_SIZE_M / 2` (16m) constant, applied
+  identically at EVERY level in `_cell_index()`/`_cell_center_at_level()` -- using the same absolute
+  shift rather than re-centering each level independently is what keeps a coarser level's cell boundaries
+  a SUBSET of a finer level's (verified: `0.5*BASE_TILE_SIZE_M / size_for_level(level)` is never an
+  integer for any level), which is what `_try_merge_upward()`'s 4-tiles-compose-1 nesting depends on.
+  Origin now falls strictly inside exactly one cell at EVERY level (and that cell's own INDEX is always
+  (0,0), a side effect of the shift, not something relied upon), and is exactly centered at level 0 (the
+  smallest tile). New `tests/test_tile_placement_grid.py` -- the first COMMITTED pytest for this module's
+  grid math at all (previously only an ad-hoc scratch script, per this doc's own earlier notes), made
+  possible by stubbing `carb`/`carb.input`/`omni.appwindow`/`omni.kit.app`/`omni.usd` via `sys.modules`
+  before import, since this module (like `ui/placement.py`) imports them at module level rather than
+  inside methods the way `backends/wave.py` deliberately does -- a real, still-open gap in this module's
+  testability, not something this round's test file tries to fix structurally.
+- Own ship gained **X/Y/Z spawn-position fields** (Own Ship UI section, plus
+  `ScenarioController.set_ship_spawn_position(x=None, y=None, z=None)`) -- `SPAWN_X`/`SPAWN_Y`/
+  `DROP_HEIGHT_M` were hardcoded module constants in `backends/ship.py`; now instance state
+  (`self._spawn_x/_spawn_y/_spawn_z`), applied the next time `set_mesh()` (re)spawns the ship or
+  `reset()` re-drops it -- not live on an already-standing ship. Z keeps `DROP_HEIGHT_M`'s original
+  meaning (meters ABOVE the ship's own settled equilibrium depth, not an absolute world Z), just
+  adjustable instead of fixed, so it still visibly drops+settles at whatever position you pick.
+  `tests/test_ship_backend.py` grew matching coverage. 119 tests total now.
+- Setup section's status label moved onto the SAME row as the "Build scene" button (was its own line
+  below) -- user, from a screenshot: "빌드하는 버튼도 아래에 주석쓰지말고 버튼 오른쪽에 status를
+  표시하도록하고" (don't put it as a note below the button, show status to the button's right).
+- Vertical spacing was ALREADY set to 0 on every section-body VStack in the previous round (both the
+  outer VStack and each `CollapsableFrame`'s content VStack) -- the user repeated the "pack it tight like
+  Weather FX" request against a fresh screenshot, which may mean the running Isaac Sim instance hadn't
+  reloaded this extension's latest code yet, or there's a remaining visual gap this code-level change
+  doesn't reach (e.g. `CollapsableFrame`'s own internal padding, not controllable via a child VStack's
+  `spacing`). **Not independently re-verified this round** (no live Isaac Sim to render against) -- if a
+  real gap remains after reloading the extension, it needs to be pinned to a SPECIFIC section/row live,
+  since the code is already at `spacing=0` everywhere and there is nothing left to blindly reduce further
+  without rendering it.
+
 ## Current status (as of 2026-10-30)
 
-Everything above is built: `core/` + `backends/wave.py`'s tile registry (112 passing tests total),
+Everything above is built: `core/` + `backends/wave.py`'s tile registry (119 passing tests total),
 `runtime/manager.py`, all three backends, `api.py`, `extension.py`, `ui/window.py`, `ui/placement.py`,
 `ui/tile_placement.py`. Verified so far: `core/`'s pure-Python logic (real pytest, including a regression
 test for the model-path portability bug and the wave-tiling phase-consistency math), every file

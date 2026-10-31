@@ -84,11 +84,13 @@ model — naval-architecture style, not a simple 4-corner spring rig — impleme
 ### Via the UI
 
 **Own ship:** "Build scene" sets up the wave infrastructure and an empty vessel pool, but does NOT spawn
-an own ship by itself. In the **Own Ship** section, pick a mesh from the dropdown and click **"Apply to
-own ship"** — this is also what actually spawns it the first time. Move it with the **I (forward) / J
-(left) / K (back) / L (right)** keys (while the 3D viewport has focus, not this panel) or the matching
-on-screen buttons; **Linear**/**Angular** control how strong that thrust/turn is (same fraction-of-weight
-/ fraction-of-max-torque convention as vessels' own Linear/Angular fields, applied live on change).
+an own ship by itself. In the **Own Ship** section, set **X/Y/Z** (Z is meters above its own settled
+depth, not an absolute world height — it still visibly drops and settles from there), pick a mesh from
+the dropdown, and click **"Apply to own ship"** — this is also what actually spawns it the first time, at
+whatever X/Y/Z is currently set. Move it with the **I (forward) / J (left) / K (back) / L (right)** keys
+(while the 3D viewport has focus, not this panel) or the matching on-screen buttons; **Linear**/
+**Angular** control how strong that thrust/turn is (same fraction-of-weight / fraction-of-max-torque
+convention as vessels' own Linear/Angular fields, applied live on change).
 
 **Vessel traffic:** in the **Vessels** section, pick a registered mesh from the dropdown, choose a
 behavior (`forward` / `backward` / `turn_left` / `turn_right` / `stationary` / `follow_path`), and either click

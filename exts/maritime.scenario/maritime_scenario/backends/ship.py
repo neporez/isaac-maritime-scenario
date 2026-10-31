@@ -49,6 +49,14 @@ class ShipBackend(Backend):
     # the UI's Own Ship Linear/Angular fields or ScenarioController.set_ship_speed()).
     self._linear_fraction = DEFAULT_THRUST_FRACTION
     self._angular_fraction = KEY_TURN_FRACTION
+    # Live-adjustable spawn position (2026-11-01, user's own call: was hardcoded to SPAWN_X/SPAWN_Y/
+    # DROP_HEIGHT_M module constants) -- set via set_spawn_position()/the UI's Own Ship X/Y/Z fields or
+    # ScenarioController.set_ship_spawn_position(). Z keeps the original DROP_HEIGHT_M semantics (meters
+    # ABOVE the ship's own settled equilibrium depth, not an absolute world Z -- see set_mesh()/reset()),
+    # just adjustable instead of fixed, so it still visibly drops+settles at any height you pick.
+    self._spawn_x = SPAWN_X
+    self._spawn_y = SPAWN_Y
+    self._spawn_z = DROP_HEIGHT_M
     self._update_sub = None
     self._keyboard_sub = None
 
@@ -92,13 +100,13 @@ class ShipBackend(Backend):
 
     stage = self.context.stage()
     bottom_z = -self._measured.dz / 2.0
-    spawn_z = DROP_HEIGHT_M - self._params.draft_m - bottom_z
+    spawn_z = self._spawn_z - self._params.draft_m - bottom_z
 
     import omni.usd
     from pxr import Gf, UsdGeom, UsdPhysics, PhysxSchema
 
     body_prim = stage.DefinePrim(BODY_PATH, "Xform")
-    self._set_xform(body_prim, SPAWN_X, SPAWN_Y, spawn_z, 0.0)
+    self._set_xform(body_prim, self._spawn_x, self._spawn_y, spawn_z, 0.0)
 
     mesh_backend.build_visual(stage, VISUAL_PATH, self._measured)
 
@@ -155,9 +163,9 @@ class ShipBackend(Backend):
     if not body:
       return
     bottom_z = -self._measured.dz / 2.0
-    spawn_z = DROP_HEIGHT_M - self._params.draft_m - bottom_z
+    spawn_z = self._spawn_z - self._params.draft_m - bottom_z
     from pxr import Gf, UsdPhysics
-    self._set_xform(body, SPAWN_X, SPAWN_Y, spawn_z, 0.0)
+    self._set_xform(body, self._spawn_x, self._spawn_y, spawn_z, 0.0)
     rb = UsdPhysics.RigidBodyAPI(body)
     rb.GetVelocityAttr().Set(Gf.Vec3f(0, 0, 0))
     rb.GetAngularVelocityAttr().Set(Gf.Vec3f(0, 0, 0))
@@ -193,6 +201,19 @@ class ShipBackend(Backend):
       self._linear_fraction = float(linear)
     if angular is not None:
       self._angular_fraction = float(angular)
+
+  def set_spawn_position(self, x=None, y=None, z=None):
+    """Overrides where the own ship spawns/re-drops from -- x/y are world-space meters, z is the same
+    "meters above its own settled equilibrium depth" DROP_HEIGHT_M always meant (not an absolute world
+    Z), so it still visibly drops+settles at whatever height you pick. Takes effect the next time
+    set_mesh() (re)spawns it or reset() re-drops it -- not live on an already-standing ship. Any arg can
+    be omitted to leave that one unchanged."""
+    if x is not None:
+      self._spawn_x = float(x)
+    if y is not None:
+      self._spawn_y = float(y)
+    if z is not None:
+      self._spawn_z = float(z)
 
   @staticmethod
   def _set_xform(prim, x, y, z, yaw_deg):

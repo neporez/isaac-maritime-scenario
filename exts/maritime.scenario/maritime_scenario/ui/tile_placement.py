@@ -18,11 +18,26 @@ overlap/containment scan per hover tick is simpler and plenty fast. The "quadtre
 SIZE semantics (powers of 2, corner-aligned so each level's cells nest exactly inside the next level's),
 not a literal node tree.
 
-The grid itself: corner-aligned, not center-aligned (changed from the previous version specifically so
-levels nest) -- cell (i, j) at a given size covers the world rect [i*size, (i+1)*size] x
-[j*size, (j+1)*size], center ((i+0.5)*size, (j+0.5)*size). A 64m cell's area is then EXACTLY covered by
-four 32m cells, corner-for-corner, which is what makes "does placing this bigger tile fully contain
-these existing smaller ones" a plain rectangle-containment check.
+The grid itself: corner-aligned, not center-aligned per cell (changed from the previous version
+specifically so levels nest) -- cell (i, j) at a given size covers the world rect
+[i*size - SHIFT, (i+1)*size - SHIFT] x [j*size - SHIFT, (j+1)*size - SHIFT], center
+((i+0.5)*size - SHIFT, (j+0.5)*size - SHIFT). A 64m cell's area is then EXACTLY covered by four 32m
+cells, corner-for-corner, which is what makes "does placing this bigger tile fully contain these
+existing smaller ones" a plain rectangle-containment check.
+
+GRID_ORIGIN_SHIFT_M (2026-11-01, user's own call): a constant SHIFT = BASE_TILE_SIZE_M / 2 = 16m, applied
+identically at every level, moves the grid so the world origin (0,0) -- where the own ship always spawns
+-- falls INSIDE a single cell at every level instead of exactly on the corner shared by 4 cells (found
+live: placing water around the ship always required 4 separate clicks just to cover its spawn point).
+Using the SAME absolute shift at every level (not re-centering each level independently around its own
+origin-containing cell, which would break the nesting property above) keeps a coarser level's boundaries
+a subset of a finer level's boundaries: level L's boundaries sit at `size_L * k - SHIFT`, and since
+size_{L+1} = 2*size_L, every level-(L+1) boundary (`2*size_L*k - SHIFT`) is also a level-L boundary (at
+k'=2k) -- the nesting this module depends on is unaffected by which constant SHIFT is used, only by it
+being the SAME one at every level. Exactly centers the origin on the SMALLEST (level 0) cell; coarser
+levels still contain the origin strictly inside one cell (never on a boundary), just not perfectly
+centered -- verified this holds at every level, not just the smallest, since `0.5 * BASE_TILE_SIZE_M /
+size_for_level(level)` is never an integer for any level >= 0.
 
 REFINING an area a bigger tile already covers (the opposite of coarsening) is deliberately NOT automatic
 -- carving a hole out of an existing tile to fit a smaller one inside it was considered and rejected by
@@ -93,6 +108,7 @@ MAX_TILE_LEVEL = 6        # a practical UI-slider ceiling (32m * 2**6 = 2048m), 
                            # ceiling) is worth doing.
 DEFAULT_TILE_LEVEL = 1    # 64m -- a reasonable middle default
 DEFAULT_BASE_RESOLUTION = 17   # 16 intervals across the smallest (level 0) tile -- see resolution_for_level()
+GRID_ORIGIN_SHIFT_M = BASE_TILE_SIZE_M / 2.0   # see the module docstring's own GRID_ORIGIN_SHIFT_M note
 
 
 def size_for_level(level):
@@ -151,21 +167,22 @@ class TilePlacementController:
   def _wave_height_at(self, x, y):
     return self.sc.wave_height_at(x, y)
 
-  # ------------------------------------------------------------ grid math (corner-aligned, per level)
+  # ------------------------------------------------------------ grid math (corner-aligned, per level,
+  # shifted by GRID_ORIGIN_SHIFT_M -- see the module docstring's own note for why)
   def _cell_index(self, x, y):
     size = self.tile_size_m
-    return int(x // size), int(y // size)
+    return int((x + GRID_ORIGIN_SHIFT_M) // size), int((y + GRID_ORIGIN_SHIFT_M) // size)
 
   def _cell_center(self, i, j):
     return self._cell_center_at_level(self.tile_level, i, j)
 
   @staticmethod
   def _cell_center_at_level(level, i, j):
-    """Same corner-aligned math as _cell_center(), but for an EXPLICIT level rather than the UI slider's
-    currently-selected one -- needed by _try_merge_upward(), which operates on the level a tile was
-    actually placed at, not whatever the slider happens to show right now."""
+    """Same corner-aligned (shifted) math as _cell_center(), but for an EXPLICIT level rather than the
+    UI slider's currently-selected one -- needed by _try_merge_upward(), which operates on the level a
+    tile was actually placed at, not whatever the slider happens to show right now."""
     size = size_for_level(level)
-    return (i + 0.5) * size, (j + 0.5) * size
+    return (i + 0.5) * size - GRID_ORIGIN_SHIFT_M, (j + 0.5) * size - GRID_ORIGIN_SHIFT_M
 
   @staticmethod
   def _fmt_index(n):

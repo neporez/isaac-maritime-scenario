@@ -94,6 +94,13 @@ class ScenarioController:
     ship (which has exactly one instance, not spawned per-call)."""
     self._manager.set_ship_speed(linear=linear, angular=angular)
 
+  def set_ship_spawn_position(self, x=None, y=None, z=None) -> None:
+    """Overrides where set_own_ship_mesh()/ship_reset() (re)spawn the own ship -- x/y are world-space
+    meters, z is meters above the ship's own settled equilibrium depth (not an absolute world Z), same
+    as the original fixed drop height. Takes effect on the NEXT spawn/reset, not live on a standing ship.
+    Any arg can be omitted to leave that one unchanged."""
+    self._manager.set_ship_spawn_position(x=x, y=y, z=z)
+
   def ship_reset(self) -> None:
     backend = self._manager.get_backend("ship")
     if backend is not None:

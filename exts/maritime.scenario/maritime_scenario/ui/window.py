@@ -78,9 +78,9 @@ class ScenarioWindow:
 
   # ------------------------------------------------------------ Build / status / assets folder
   def _build_setup_section(self):
-    ui.Button("Build scene", height=32, clicked_fn=self._on_build_clicked)
-    self._status_label = ui.Label(self._status_text(), height=18, word_wrap=True,
-                                   style={"color": 0xFFFFCC66})
+    with ui.HStack(spacing=6):
+      ui.Button("Build scene", height=28, width=110, clicked_fn=self._on_build_clicked)
+      self._status_label = ui.Label(self._status_text(), word_wrap=True, style={"color": 0xFFFFCC66})
     with ui.HStack(spacing=6):
       ui.Label("Boat assets:", width=80)
       self._mesh_dir_label = ui.Label(self._sc.get_mesh_dir() or "(not set)", word_wrap=True)
@@ -237,6 +237,21 @@ class ScenarioWindow:
   def _build_own_ship_section(self):
     labels = [label for label, _ in self._mesh_choices] or ["(press Build scene first)"]
     self._own_ship_mesh_combo = ui.ComboBox(0, *labels, height=24)
+
+    with ui.HStack(spacing=6):
+      ui.Label("X (m)", width=40)
+      self._ship_x_field = ui.FloatField(height=24)
+      self._ship_x_field.model.add_value_changed_fn(
+        lambda m: self._sc.set_ship_spawn_position(x=m.get_value_as_float()))
+      ui.Label("Y (m)", width=40)
+      self._ship_y_field = ui.FloatField(height=24)
+      self._ship_y_field.model.add_value_changed_fn(
+        lambda m: self._sc.set_ship_spawn_position(y=m.get_value_as_float()))
+      ui.Label("Z (m)", width=40)
+      self._ship_z_field = ui.FloatField(height=24)
+      self._ship_z_field.model.set_value(1.5)
+      self._ship_z_field.model.add_value_changed_fn(
+        lambda m: self._sc.set_ship_spawn_position(z=m.get_value_as_float()))
 
     def _apply():
       if not self._mesh_choices:
