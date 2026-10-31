@@ -1,67 +1,71 @@
+<div align="center">
+
 # Maritime Scenario
 
-An [NVIDIA Isaac Sim](https://developer.nvidia.com/isaac/sim) extension for building maritime
-simulation scenes: physically-based Gerstner waves, a controllable own ship with naval-architecture-style
-buoyancy, and autonomous vessel traffic — driven from a UI panel or a Python API.
+**Physically-based waves, a controllable own ship, and autonomous vessel traffic for [NVIDIA Isaac Sim](https://developer.nvidia.com/isaac/sim) — from a panel or from Python.**
 
-![Maritime Scenario panel and scene overview](images/hero.png)
+<img src="docs/images/hero.png" width="100%" alt="A maritime scenario in Isaac Sim: tiled Gerstner waves, the own ship, and vessel traffic with waypoint paths"/>
 
-## Features
+*Every boat here floats because of its own measured size, not a hand-picked spring constant.*
 
-- **Gerstner wave simulation** — amplitude/wavelength/speed/steepness/wave-train count, all tunable live.
-  Water is built from independent tiles (not one fixed plane), placed by mouse in a power-of-2
-  quadtree-style grid with automatic T-junction-free LOD: place a few fine tiles near the ship and coarser
-  ones further out, and same-size quartets auto-merge upward into bigger tiles. Distance-based tile
-  activation plus an optional NVIDIA Warp GPU batching path keep this fast even with the water extending
-  far past where any one tile would be practical alone.
-- **Own ship** — naval-architecture-style heave/roll/pitch (a damped oscillator per axis, not a simple
-  4-corner spring rig), with mass/stiffness/inertia *derived* from the hull's own measured size, not
-  hand-picked per boat. Drive it with the on-screen Forward/Left/Back/Right buttons, set its spawn
-  position/speed, swap its mesh live.
-- **Vessel traffic** — spawn a random collision-free swarm, or place vessels one at a time (by mouse,
-  typed position, or a waypoint path), with `forward`/`backward`/`turn_left`/`turn_right`/`stationary`/
-  `follow_path` behaviors. Vessels (and the own ship) are held at the edge of whatever water is actually
-  placed by an invisible wall, instead of sailing off the map.
-- **Bring your own boat assets** — point the extension at any folder of `.usd`/`.usdz`/`.usdc` models from
-  the UI (no restart needed); with none registered yet, every mesh picker falls back to a simple
-  physically-simulated placeholder box so you can test behavior/buoyancy/scenario layout before any real
-  art asset exists. See [`assets/models/README.md`](assets/models/README.md) for the full guide
-  (registering a model, how buoyancy is computed, every way to spawn a boat).
-- **Save / load scenarios** as JSON — sea state, ship physics coefficients, own ship mesh, and every
-  vessel's current position/behavior/remaining waypoints.
+</div>
+
+---
+
+## What is in it
+
+| | How it works | Main controls |
+|---|---|---|
+| **Gerstner waves** | Water is built from independent tiles (not one fixed plane), placed by mouse in a power-of-2 quadtree-style grid with T-junction-free LOD: same-size quartets auto-merge upward, differently-sized neighbors still share vertices exactly at their boundary. Distance-based tile activation plus an optional NVIDIA Warp GPU batching path keep this fast with a lot of water placed. | amplitude, wavelength, speed, steepness, wave trains, active radius |
+| **Own ship** | Naval-architecture-style heave/roll/pitch — a damped oscillator per axis, not a simple 4-corner spring rig — with mass, stiffness and inertia *derived* from the hull's own measured size, not hand-picked per boat. | spawn X/Y/Z, linear/angular thrust, mesh |
+| **Vessel traffic** | A random collision-free swarm, or one-at-a-time placement by mouse, typed position, or a waypoint path. Vessels (and the own ship) are held at the edge of whatever water is actually placed by an invisible wall, instead of sailing off the map. | behavior, linear/angular speed, waypoints |
+| **Boat assets** | Point the extension at any folder of `.usd`/`.usdz`/`.usdc` models from the UI, no restart needed. With none registered yet, every mesh picker falls back to a simple physically-simulated placeholder box, so behavior/buoyancy/scenario layout are all testable before any real art asset exists. | mesh folder |
+| **Save / load** | A scenario's full state as JSON — sea state, ship physics coefficients, own ship mesh, and every vessel's current position/behavior/remaining waypoints. | filename |
+
+---
 
 ## Screenshots
 
-![Water tiles placed around the own ship](images/water-tiles.png)
-![Own ship riding the waves](images/own-ship.png)
-![Vessel traffic with waypoint paths](images/vessel-traffic.png)
+<table>
+<tr>
+<td width="50%"><img src="docs/images/water-tiles.png" width="100%"/></td>
+<td width="50%"><img src="docs/images/own-ship.png" width="100%"/></td>
+</tr>
+<tr>
+<td><b>Water tiles</b>, placed by mouse around the own ship's spawn point.</td>
+<td><b>The own ship</b>, riding the wave surface it's actually floating in.</td>
+</tr>
+<tr>
+<td colspan="2"><img src="docs/images/vessel-traffic.png" width="100%"/></td>
+</tr>
+<tr>
+<td colspan="2" align="center"><b>Vessel traffic</b> with waypoint paths drawn for each <code>follow_path</code> boat.</td>
+</tr>
+</table>
 
-## Requirements
+---
 
-- NVIDIA Isaac Sim (Kit 107+)
-- Python 3.10+ (Isaac Sim's own bundled Python)
-- [`pytest`](https://pypi.org/project/pytest/) if you want to run the test suite outside Isaac Sim (the
-  `core/` logic and several backend modules are pure-Python/pxr-only and testable without a running sim)
+## Install
 
-## Installation
+1. Clone this repository.
+2. In Isaac Sim: **Window → Extensions → ☰ → Settings → Extension Search Paths**, add `<repo>/exts`.
+3. Search for **Maritime Scenario**, enable it, and open **Window → Maritime Scenario** (it also opens
+   automatically on startup).
 
-1. Clone this repo somewhere Isaac Sim can see it:
-   ```bash
-   git clone https://github.com/neporez/isaac-maritime-scenario.git
-   ```
-2. In Isaac Sim: **Window → Extensions → ☰ → Settings → Extension Search Paths**, add
-   `<repo>/exts` (the path to this cloned repo's `exts` folder).
-3. Find **"Maritime Scenario"** in the extension list and enable it. The panel opens automatically
-   (`open_window_on_startup`).
+Isaac Sim (Kit 107+). `pytest` only if you want to run the test suite outside Isaac Sim — `core/` and
+several backend modules are pure-Python/pxr-only and testable without a running sim.
 
-## How to use
+---
 
-1. Click **Build scene** to set up the wave infrastructure and an empty vessel pool. This does *not*
-   place any visible water or spawn an own ship by itself.
-2. Set the sea state and lay down water — see [Water & Waves](docs/water-and-waves.md).
-3. Register boat assets (or just use the built-in placeholder box) and spawn an own ship + vessels — see
-   [`assets/models/README.md`](assets/models/README.md).
-4. Press **Play**.
+## Documentation
+
+| | |
+|---|---|
+| [**Water & Waves**](docs/water-and-waves.md) | Gerstner wave settings, placing water tiles, the LOD/auto-merge system |
+| [**Boat Assets & Scenarios**](assets/models/README.md) | Registering a boat model, how buoyancy is computed, every way to spawn a boat |
+| [**Engineering log**](CLAUDE.md) | Every design decision, measured number, and live bug found along the way |
+
+---
 
 ## Project structure
 
@@ -74,22 +78,21 @@ exts/maritime.scenario/maritime_scenario/
   api.py       the public Python API (the UI panel uses exactly this, nothing more)
 tests/         pytest suite for everything that doesn't require a running Isaac Sim
 assets/models/ where you put your own boat assets (not bundled -- see its own README)
-docs/          screenshot-driven usage guides (water & waves; boat assets/scenarios live in assets/models/)
+docs/          screenshot-driven usage guides
 ```
 
-For the full engineering log — every design decision, measured number, live bug, and why things are built
-the way they are — see [`CLAUDE.md`](CLAUDE.md). It's written as a working document for AI-assisted
-development sessions, not polished prose, but it's the most complete record of *why* this project looks
-the way it does.
+---
 
 ## Built with Claude Code
 
 This project was built in close collaboration with [Claude Code](https://claude.com/claude-code) —
 design discussions, implementation, debugging, and the test suite were all developed together across many
-sessions. Commits are attributed accordingly (`Co-Authored-By: Claude`). `CLAUDE.md` is the actual working
-log from that process: hypotheses stated before testing them, live bugs found and fixed, and the reasoning
-behind each design choice — published as-is rather than cleaned up, since that process is as much a part
-of this project as the code it produced.
+sessions. Commits are attributed accordingly (`Co-Authored-By: Claude`). [`CLAUDE.md`](CLAUDE.md) is the
+actual working log from that process: hypotheses stated before testing them, live bugs found and fixed,
+and the reasoning behind each design choice — published as-is rather than cleaned up, since that process
+is as much a part of this project as the code it produced.
+
+---
 
 ## License
 

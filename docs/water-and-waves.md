@@ -1,8 +1,8 @@
 # Water & waves
 
-How to set the sea state and lay down the water your scenario's boats float on. See the main
-[README](../README.md#how-to-use) for where this fits in the overall workflow — this covers the **Water
-Tiles** and **Gerstner Wave** sections of the panel specifically.
+How to set the sea state and lay down the water your scenario's boats float on. This covers the **Water
+Tiles** and **Gerstner Wave** sections of the panel; for boat assets, spawning, and scenario setup, see
+[`assets/models/README.md`](../assets/models/README.md).
 
 ## Gerstner wave settings
 
