@@ -248,6 +248,18 @@ class ScenarioWindow:
 
     ui.Button("Apply to own ship", height=28, clicked_fn=_apply)
 
+    with ui.HStack(spacing=6):
+      ui.Label("Linear", width=50)
+      self._ship_linear_field = ui.FloatField(height=24)
+      self._ship_linear_field.model.set_value(0.3)
+      self._ship_linear_field.model.add_value_changed_fn(
+        lambda m: self._sc.set_ship_speed(linear=m.get_value_as_float()))
+      ui.Label("Angular", width=55)
+      self._ship_angular_field = ui.FloatField(height=24)
+      self._ship_angular_field.model.set_value(0.01)
+      self._ship_angular_field.model.add_value_changed_fn(
+        lambda m: self._sc.set_ship_speed(angular=m.get_value_as_float()))
+
     with ui.HStack(spacing=0):
       ui.Spacer(width=70)
       self._make_hold_button("Forward (I)", "forward", width=100)
@@ -256,8 +268,8 @@ class ScenarioWindow:
       self._make_hold_button("Left (J)", "left", width=70)
       self._make_hold_button("Back (K)", "back", width=100)
       self._make_hold_button("Right (L)", "right", width=70)
-    ui.Label("Keyboard: I/J/K/L also works while this window has focus.", height=16, word_wrap=True,
-             style={"color": 0xFF888888})
+    ui.Label("Keyboard: I/J/K/L also works -- click into the 3D viewport first (not this panel).",
+             height=16, word_wrap=True, style={"color": 0xFF888888})
 
   def _make_hold_button(self, label, control_name, width=80):
     """A button that drives ScenarioController.ship_control(control_name, pressed) for as long as it's

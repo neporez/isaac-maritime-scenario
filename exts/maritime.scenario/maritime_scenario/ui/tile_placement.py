@@ -81,8 +81,16 @@ COLOR_AVAILABLE = Gf.Vec3f(0.2, 0.9, 0.3)   # green -- empty, click to place
 COLOR_OCCUPIED = Gf.Vec3f(0.9, 0.2, 0.2)    # red -- place: blocked: delete: this is what you'd remove
 
 BASE_TILE_SIZE_M = 32.0   # level 0's size -- size_for_level(level) = BASE_TILE_SIZE_M * 2**level
-MAX_TILE_LEVEL = 10       # a practical UI-slider ceiling (32m * 2**10 ~= 32.8km), not a structural limit
-                           # anywhere else in the math -- raise it later if ever needed ("무한대로", 2026-10-30)
+MAX_TILE_LEVEL = 6        # a practical UI-slider ceiling (32m * 2**6 = 2048m), lowered from 10
+                           # (2026-11-01, user's own call: resolution_for_level()'s constant-vertex-
+                           # spacing formula means vertex COUNT grows with tile AREA -- level 10's
+                           # ~32.8km tile at the default base_resolution=17 works out to a (16*2**10+1)^2
+                           # ~= 268M-vertex single mesh, which breaks (confirmed live: "30000미터면
+                           # 터진다"). Level 6's ~1025x1025 (~1.05M vertices) is the practical ceiling
+                           # found to actually work -- not a structural limit anywhere else in the math,
+                           # so this can be raised again later if a real fix for the vertex-count blowup
+                           # (e.g. capping resolution_for_level() independent of size, not just this UI
+                           # ceiling) is worth doing.
 DEFAULT_TILE_LEVEL = 1    # 64m -- a reasonable middle default
 DEFAULT_BASE_RESOLUTION = 17   # 16 intervals across the smallest (level 0) tile -- see resolution_for_level()
 

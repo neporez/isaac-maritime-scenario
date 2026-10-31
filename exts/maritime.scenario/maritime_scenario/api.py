@@ -88,6 +88,12 @@ class ScenarioController:
     if backend is not None:
       backend.set_thrust(newtons)
 
+  def set_ship_speed(self, linear=None, angular=None) -> None:
+    """Overrides the own ship's key-held forward/back thrust fraction and/or left/right turn-torque
+    fraction -- the same convention as spawn_vessel()'s linear_speed/angular_speed, just for the own
+    ship (which has exactly one instance, not spawned per-call)."""
+    self._manager.set_ship_speed(linear=linear, angular=angular)
+
   def ship_reset(self) -> None:
     backend = self._manager.get_backend("ship")
     if backend is not None:

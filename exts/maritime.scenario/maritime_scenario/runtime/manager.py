@@ -123,6 +123,11 @@ class ScenarioManager:
     backend = self.get_backend("ship")
     return backend.mesh_id if backend is not None else None
 
+  def set_ship_speed(self, linear=None, angular=None):
+    backend = self.get_backend("ship")
+    if backend is not None:
+      backend.set_speed(linear=linear, angular=angular)
+
   # ------------------------------------------------------------ mesh folder (delegated to core.meshes)
   def set_mesh_dir(self, path):
     """Overrides where boat assets are loaded from, at runtime -- see core.meshes.set_model_dir()'s own

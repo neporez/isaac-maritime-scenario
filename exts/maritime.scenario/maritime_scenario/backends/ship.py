@@ -27,8 +27,10 @@ SPAWN_X, SPAWN_Y = 0.0, 0.0
 DROP_HEIGHT_M = 1.5   # spawn this many meters above its settled depth, so it visibly drops+settles
 LINEAR_DAMPING = 0.8
 
-DEFAULT_THRUST_FRACTION = 0.3
-KEY_TURN_FRACTION = 0.01   # fraction of max_torque_nm, same as the original's KEY_TURN_NM convention
+DEFAULT_THRUST_FRACTION = 0.3   # fraction of mass*gravity -> key-held forward/back thrust, same role
+                                 # core.vessel.DEFAULT_LINEAR_SPEED plays for vessels
+KEY_TURN_FRACTION = 0.01   # fraction of max_torque_nm -> key-held left/right turn torque, same role
+                            # core.vessel.DEFAULT_ANGULAR_SPEED plays for vessels
 
 
 class ShipBackend(Backend):
@@ -41,6 +43,12 @@ class ShipBackend(Backend):
     self._prev = {"z": None, "roll": None, "pitch": None}
     self._controls = {"forward": False, "back": False, "left": False, "right": False}
     self._thrust_n = 0.0
+    # Live-adjustable versions of the two module constants above (2026-11-01, user's own call: own ship
+    # had no Linear/Angular speed control at all, unlike vessels' per-spawn linear_speed/angular_speed --
+    # these are the same fractions, just instance state instead of hardcoded, set via set_speed() from
+    # the UI's Own Ship Linear/Angular fields or ScenarioController.set_ship_speed()).
+    self._linear_fraction = DEFAULT_THRUST_FRACTION
+    self._angular_fraction = KEY_TURN_FRACTION
     self._update_sub = None
     self._keyboard_sub = None
 
@@ -177,6 +185,15 @@ class ShipBackend(Backend):
     """Steady cruise thrust along the hull's own +x (bow) axis, on top of any held forward/back key."""
     self._thrust_n = float(newtons)
 
+  def set_speed(self, linear=None, angular=None):
+    """Overrides the key-held forward/back thrust fraction and/or left/right turn-torque fraction --
+    the same (mass*gravity)/(max_torque) fraction convention as core.vessel's linear_speed/angular_speed,
+    just for the own ship. Either arg can be omitted to leave that one unchanged."""
+    if linear is not None:
+      self._linear_fraction = float(linear)
+    if angular is not None:
+      self._angular_fraction = float(angular)
+
   @staticmethod
   def _set_xform(prim, x, y, z, yaw_deg):
     from pxr import Gf, UsdGeom
@@ -265,7 +282,7 @@ class ShipBackend(Backend):
     total_force = Gf.Vec3f(0.0, 0.0, f_heave)
     total_torque = Gf.Vec3f(*forward) * torque_roll + Gf.Vec3f(*beam) * torque_pitch
 
-    key_thrust_n = DEFAULT_THRUST_FRACTION * self._params.mass_kg * ship_motion.GRAVITY
+    key_thrust_n = self._linear_fraction * self._params.mass_kg * ship_motion.GRAVITY
     thrust = self._thrust_n
     if self._controls["forward"]:
       thrust += key_thrust_n
@@ -275,7 +292,7 @@ class ShipBackend(Backend):
       total_force += Gf.Vec3f(*forward) * thrust
 
     if self._controls["left"] or self._controls["right"]:
-      key_turn_nm = KEY_TURN_FRACTION * self._params.max_torque_nm
+      key_turn_nm = self._angular_fraction * self._params.max_torque_nm
       turn = key_turn_nm if self._controls["left"] else -key_turn_nm
       total_torque += Gf.Vec3f(*up) * turn
 

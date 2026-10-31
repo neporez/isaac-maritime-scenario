@@ -723,9 +723,46 @@ buttons, a lower default draft, "Build scene" moved to the top (2026-10-31).**
   to the Yaw/Step fields below, not Angular, which is the vessel's autonomous turning SPEED -- but the
   user asked for it beside Angular specifically, so that's where it went).
 
+**Own ship Linear/Angular speed control, tile-level ceiling lowered 10 -> 6 after a live crash, I/J/K/L
+reported not working (2026-11-01).**
+- `MAX_TILE_LEVEL` (`ui/tile_placement.py`) lowered from 10 to 6, confirmed live: "30000미터하면 터진다"
+  (breaks at ~30,000m). The math behind why: `resolution_for_level()` keeps constant vertex SPACING
+  across levels, which means vertex COUNT grows with tile AREA, not linearly with level -- at the default
+  `base_resolution=17`, level 10's ~32.8km tile works out to a `(16*2**10+1)^2 ~= 268M`-vertex single
+  mesh, while level 6's ~2048m tile is "only" `(16*64+1)^2 ~= 1.05M` vertices, apparently the practical
+  ceiling that actually holds up. Not a structural fix (capping resolution growth independent of tile
+  size would be the real one) -- just pulling the UI ceiling back from a value a previous round had
+  pushed toward "uncapped" without this having been tried live yet.
+- Own ship had no Linear/Angular speed control at all, unlike vessels (which get `linear_speed`/
+  `angular_speed` per spawn_vessel() call) -- `backends/ship.py`'s key-held forward/back thrust and
+  left/right turn torque were hardcoded to module constants (`DEFAULT_THRUST_FRACTION=0.3`,
+  `KEY_TURN_FRACTION=0.01`), the exact same fraction-of-(mass*gravity)/(max_torque) convention as
+  `core.vessel.DEFAULT_LINEAR_SPEED`/`DEFAULT_ANGULAR_SPEED` (same default values too -- confirmed these
+  were always meant to be the ship-equivalent of the same parameter, just never exposed). Made instance
+  state (`self._linear_fraction`/`self._angular_fraction`, seeded from those same module constants) with
+  a new `set_speed(linear=None, angular=None)`, threaded through
+  `ScenarioManager.set_ship_speed()`/`ScenarioController.set_ship_speed()`, and a Linear/Angular field row
+  in the Own Ship UI section (applies live on change, same pattern as the wave/physics sliders) --
+  `tests/test_ship_backend.py` (new file) covers `set_speed()` directly since it's pure Python, unlike
+  `build()`/`_on_update()` which stay untested here (pxr-dependent, same standing caveat as the rest of
+  `ship.py`). 112 tests total now.
+- User reported I/J/K/L not actually moving the ship live. Static review of `_start_keyboard()`/
+  `_on_update()` found no code bug -- the keyboard subscription setup (`carb.input`, unchanged this
+  round) looks structurally correct, and the far more likely explanations are procedural: (a) "Build
+  scene" no longer auto-spawns the ship (this session's own earlier change) -- without clicking "Apply to
+  own ship" first, there's no body for the keys to move; (b) the own ship only responds while the
+  timeline is PLAYING (`_on_update()`'s own early-return), not just built; (c) Omniverse apps commonly
+  only route raw keyboard events to `carb.input` subscribers while the 3D VIEWPORT has focus, not a
+  floating extension panel -- if focus was on this panel (e.g. a field was just edited) when I/J/K/L was
+  pressed, that would also explain it. (c) is the one most worth checking live first. The Own Ship
+  section's keyboard hint label was reworded to say so directly ("click into the 3D viewport first (not
+  this panel)") rather than leave it as an open question -- **still not confirmed live, same standing
+  caveat as every other keyboard/mouse-event-dependent piece of this UI**; if none of (a)/(b)/(c) explain
+  it, the actual `carb.input`/`omni.appwindow` wiring needs to be debugged live next, not re-guessed here.
+
 ## Current status (as of 2026-10-30)
 
-Everything above is built: `core/` + `backends/wave.py`'s tile registry (110 passing tests total),
+Everything above is built: `core/` + `backends/wave.py`'s tile registry (112 passing tests total),
 `runtime/manager.py`, all three backends, `api.py`, `extension.py`, `ui/window.py`, `ui/placement.py`,
 `ui/tile_placement.py`. Verified so far: `core/`'s pure-Python logic (real pytest, including a regression
 test for the model-path portability bug and the wave-tiling phase-consistency math), every file
