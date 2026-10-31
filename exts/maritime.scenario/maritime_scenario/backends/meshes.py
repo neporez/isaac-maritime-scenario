@@ -29,8 +29,28 @@ class MeasuredMesh:
 
 _cache = {}   # mesh_id -> MeasuredMesh, measured once per process (USD files don't change at runtime)
 
+FALLBACK_MESH_ID = "__default_box__"
+FALLBACK_DX, FALLBACK_DY, FALLBACK_DZ = 8.0, 2.5, 1.8   # generic small-boat-ish proportions (length > beam > height)
+
+
+def fallback_measured():
+  """A synthetic elongated-box stand-in, used when no real boat assets are registered at all (mesh
+  folder unset/empty) -- see build_visual()'s own docstring for why this exists. No real usd_path (the
+  empty string is the signal build_visual()/the UI check for), no pxr touched here at all."""
+  return MeasuredMesh(mesh_id=FALLBACK_MESH_ID, usd_path="", scale=1.0, rot_x_deg=0.0,
+                       dx=FALLBACK_DX, dy=FALLBACK_DY, dz=FALLBACK_DZ, local_center=(0.0, 0.0, 0.0))
+
+
+def clear_cache():
+  """Measured meshes are cached by mesh_id assuming the underlying file never changes mid-process --
+  true unless the mesh FOLDER itself changes (ScenarioController.set_mesh_dir(), 2026-10-31), which
+  reuses the same mesh_ids against different paths. Called from there, not needed otherwise."""
+  _cache.clear()
+
 
 def measure(mesh_id):
+  if mesh_id == FALLBACK_MESH_ID:
+    return fallback_measured()
   if mesh_id in _cache:
     return _cache[mesh_id]
   import os
@@ -60,14 +80,17 @@ def measure(mesh_id):
 def list_all():
   """Every mesh whose .usd file actually exists right now, measured -- the UI's mesh picker source.
   Uses core.meshes.list_available() rather than the full registry, so an unpopulated/partially-
-  populated assets/models/ doesn't crash the picker, it just offers fewer choices (with a console
-  warning so it's not silently empty)."""
+  populated assets/models/ doesn't crash the picker. NEVER returns empty (2026-10-31): falls back to
+  [fallback_measured()] alone when no real assets are registered, so the UI always has SOMETHING to
+  spawn -- a visible box instead of a disabled picker or a silent no-op -- see build_visual()."""
   available = mesh_registry.list_available()
   if not available:
     import logging
     logging.getLogger("maritime_scenario").warning(
       "maritime_scenario: no mesh files found in %s -- see core/meshes.py's module docstring "
-      "(this repo doesn't bundle any 3D models, you need to supply your own)", mesh_registry.WEB_MODEL_DIR)
+      "(this repo doesn't bundle any 3D models, you need to supply your own). Using a placeholder box "
+      "mesh for now.", mesh_registry.WEB_MODEL_DIR)
+    return [fallback_measured()]
   return [measure(m.mesh_id) for m in available]
 
 
@@ -102,3 +125,34 @@ def set_visual_xform(prim, measured: MeasuredMesh):
     Gf.Vec3d(measured.scale, measured.scale, measured.scale))
   if measured.rot_x_deg != 0.0:
     xform.AddRotateXOp(UsdGeom.XformOp.PrecisionFloat, opSuffix="unitsResolve").Set(float(measured.rot_x_deg))
+
+
+def build_visual(stage, path, measured: MeasuredMesh):
+  """Builds the actual visible geometry for one spawned body (own ship or a vessel) at `path` -- a real
+  mesh reference for a registered asset, or a plain elongated box when no real boat assets are set up
+  yet (measured.usd_path == "", i.e. measured came from fallback_measured()), so "Apply to own ship" and
+  vessel spawning always produce something visible and physically reasonable instead of failing or
+  spawning nothing (2026-10-31, user's own call: don't block on art assets to test the simulation).
+  Shared by ship.py's set_mesh() and vessels.py's _spawn_prim() -- both previously duplicated the same
+  three-line reference+strip+xform sequence inline; this also meant the fallback case only had to be
+  written once. DefinePrim(path, ...) re-declares the type every call, so switching a body between a
+  real mesh and the fallback box (or between two real meshes) always starts from a clean prim type."""
+  from pxr import Gf, UsdGeom
+
+  if not measured.usd_path:
+    cube_prim = stage.DefinePrim(path, "Cube")
+    cube = UsdGeom.Cube(cube_prim)
+    cube.CreateSizeAttr(1.0)   # unit cube (-0.5..0.5 per axis) -- scaled to real half-size below
+    cube.CreateDisplayColorAttr([Gf.Vec3f(0.55, 0.35, 0.15)])   # hull-brown, visually a placeholder
+    xform = UsdGeom.Xformable(cube_prim)
+    xform.ClearXformOpOrder()
+    xform.AddScaleOp(UsdGeom.XformOp.PrecisionDouble).Set(
+      Gf.Vec3d(measured.dx, measured.dy, measured.dz))
+    return cube_prim
+
+  visual_prim = stage.DefinePrim(path, "Xform")
+  visual_prim.GetReferences().ClearReferences()
+  visual_prim.GetReferences().AddReference(measured.usd_path)
+  strip_bad_normals(visual_prim)
+  set_visual_xform(visual_prim, measured)
+  return visual_prim

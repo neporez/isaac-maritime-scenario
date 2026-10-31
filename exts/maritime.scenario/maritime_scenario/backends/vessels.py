@@ -76,10 +76,7 @@ class VesselsBackend(Backend):
     self._next_idx = 0
     self._live = []
 
-    all_meshes = mesh_backend.list_all()
-    if not all_meshes:
-      log.warning("maritime_scenario(vessels): mesh pool is empty -- nothing to spawn")
-      return
+    all_meshes = mesh_backend.list_all()   # never empty -- falls back to a placeholder box (see its own docstring)
 
     area = self.context.manager.state_ref.general.area_m
     placed_obbs = []
@@ -177,10 +174,7 @@ class VesselsBackend(Backend):
     body_prim = stage.DefinePrim(body_path, "Xform")
     self._set_xform(body_prim, vessel.x, vessel.y, z, vessel.yaw_deg)
 
-    visual_prim = stage.DefinePrim(body_path + "/visual", "Xform")
-    visual_prim.GetReferences().AddReference(measured.usd_path)
-    mesh_backend.strip_bad_normals(visual_prim)
-    mesh_backend.set_visual_xform(visual_prim, measured)
+    mesh_backend.build_visual(stage, body_path + "/visual", measured)
 
     collider_prim = stage.DefinePrim(body_path + "/collider_proxy", "Cube")
     UsdGeom.Xformable(collider_prim).AddScaleOp(UsdGeom.XformOp.PrecisionDouble).Set(

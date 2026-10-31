@@ -5,9 +5,10 @@ Example (Script Editor or standalone script)::
     from maritime_scenario import api as scenario
 
     sc = scenario.get_controller()
-    await sc.setup_async()                 # builds the wave, own ship, vessel pool -- once
+    await sc.setup_async()                 # builds the wave infrastructure + empty vessel pool -- once;
+                                            # does NOT spawn an own ship by itself
     sc.set_wave(amplitude_m=1.2)
-    sc.set_own_ship_mesh("boat3")
+    sc.set_own_ship_mesh("boat3")          # spawns the own ship (also how you swap its mesh later)
     sc.spawn_vessel("boat1", x=50, y=20, behavior="forward")
     sc.set_vessel_count(10)                # random swarm, replaces whatever's there
 """
@@ -67,8 +68,10 @@ class ScenarioController:
     await self._manager.setup_async()
 
   # ------------------------------------------------------------ own ship
-  def set_own_ship_mesh(self, mesh_id: str) -> None:
-    self._manager.set_own_ship_mesh(mesh_id)
+  def set_own_ship_mesh(self, mesh_id: str) -> bool:
+    """Returns True if mesh_id resolved to the fallback placeholder box (no real boat assets registered
+    under the current mesh folder) rather than a real asset."""
+    return self._manager.set_own_ship_mesh(mesh_id)
 
   @property
   def own_ship_mesh_id(self):
@@ -129,10 +132,21 @@ class ScenarioController:
 
   # ------------------------------------------------------------ meshes
   def list_mesh_choices(self):
-    """Every registered web mesh, measured (mesh_id, usd_path, scale, dx, dy, dz, local_center) --
-    the UI's mesh picker source."""
+    """Every registered web mesh, measured (mesh_id, usd_path, scale, dx, dy, dz, local_center) -- the
+    UI's mesh picker source. Never empty: falls back to a single synthetic placeholder-box entry (empty
+    usd_path) when no real assets are registered under the current mesh folder."""
     from .backends import meshes as mesh_backend
     return mesh_backend.list_all()
+
+  def set_mesh_dir(self, path: str) -> None:
+    """Points boat asset loading at `path` instead of the default assets/models folder (or whatever
+    MARITIME_SCENARIO_MESH_DIR was set to at startup) -- the UI's "Choose folder..." button calls this.
+    Takes effect for the NEXT set_own_ship_mesh()/spawn_vessel() call; anything already spawned keeps
+    its current mesh until re-applied."""
+    self._manager.set_mesh_dir(path)
+
+  def get_mesh_dir(self) -> str:
+    return self._manager.get_mesh_dir()
 
   def wave_height_at(self, x, y) -> float:
     backend = self._manager.get_backend("wave")

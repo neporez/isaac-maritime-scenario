@@ -65,10 +65,27 @@ _MODEL_SPECS = [
   ("boat13", "boat13.usd", 0.015),
 ]
 
-WEB_MESHES = [MeshEntry(mesh_id, os.path.join(WEB_MODEL_DIR, filename), scale)
-              for mesh_id, filename, scale in _MODEL_SPECS]
 
+def _build_registry():
+  return [MeshEntry(mesh_id, os.path.join(WEB_MODEL_DIR, filename), scale)
+          for mesh_id, filename, scale in _MODEL_SPECS]
+
+
+WEB_MESHES = _build_registry()
 _BY_ID = {m.mesh_id: m for m in WEB_MESHES}
+
+
+def set_model_dir(path):
+  """Overrides WEB_MODEL_DIR at runtime (2026-10-31) -- the UI's "Choose folder..." button (Setup panel)
+  calls this via ScenarioController.set_mesh_dir() instead of requiring the MARITIME_SCENARIO_MESH_DIR
+  env var to be set before Isaac Sim even starts. Rebuilds WEB_MESHES/_BY_ID's paths against the new
+  dir; does NOT clear backends.meshes' measured-mesh cache itself (old paths may now be stale) --
+  ScenarioController.set_mesh_dir() does that part, this function only touches this module's own
+  pure-Python state (kept separate so this stays testable without pxr, same as everything else here)."""
+  global WEB_MODEL_DIR, WEB_MESHES, _BY_ID
+  WEB_MODEL_DIR = path
+  WEB_MESHES = _build_registry()
+  _BY_ID = {m.mesh_id: m for m in WEB_MESHES}
 
 
 def get(mesh_id):

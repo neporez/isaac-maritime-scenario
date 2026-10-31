@@ -7,17 +7,37 @@ in the scene, and how to get one onto the water (via the UI or the Python API).
 
 ## 1. Registering your own USD asset
 
-[`core/meshes.py`](../../exts/maritime.scenario/maritime_scenario/core/meshes.py) is a plain data registry
-— a list of `(mesh_id, filename, scale, rot_x_deg)` entries, each pointing at a `.usd`/`.usdz`/`.usdc` file
-in this folder (or wherever `MARITIME_SCENARIO_MESH_DIR` points, see below). To add a model:
+### Pointing the extension at your assets folder
 
-1. Drop your `.usd`/`.usdz`/`.usdc` file in this folder.
+The easiest way: in the panel's **Setup** section, click **"Choose folder..."** and pick any folder
+containing your `.usd`/`.usdz`/`.usdc` boat models. This calls
+`ScenarioController.set_mesh_dir(path)` (`api.py`) under the hood, so it also works from a script without
+the UI. If you never set one, it falls back to the `MARITIME_SCENARIO_MESH_DIR` environment variable,
+then to this folder (`assets/models/`) by default.
+
+![Choosing a boat assets folder from the Setup panel](images/asset-registration.png)
+
+### If no assets are set up yet
+
+The mesh picker never comes up empty: with no real `.usd` files found anywhere above, every mesh
+dropdown offers a single placeholder — a plain elongated box with reasonable boat-ish proportions. Spawning
+it (own ship or a vessel) shows a warning in the status line ("no boat assets folder set...") but still
+drops a physically-simulated box onto the water, so you can test buoyancy/behavior/scenario layout before
+any real art asset exists. See `backends/meshes.py`'s `build_visual()`/`fallback_measured()`.
+
+![A placeholder box spawned with no assets folder set](images/fallback-box.png)
+
+### Registering a real model
+
+[`core/meshes.py`](../../exts/maritime.scenario/maritime_scenario/core/meshes.py) is a plain data registry
+— a list of `(mesh_id, filename, scale, rot_x_deg)` entries, each pointing at a file inside whichever
+folder is currently set (above). To add a model:
+
+1. Drop your `.usd`/`.usdz`/`.usdc` file in that folder.
 2. Add (or edit) an entry in `core/meshes.py`'s `_MODEL_SPECS` list. `mesh_id` is just a stable key used
    everywhere else in the project (vessel spawning, scenario JSON) — it doesn't have to follow the
    `boatN` naming.
 3. Tune `scale` (see below) and, if needed, `rot_x_deg`.
-
-![Asset registration: folder layout + _MODEL_SPECS entry](images/asset-registration.png)
 
 ### Scale matters — read this before you spawn anything
 
@@ -36,11 +56,6 @@ model's real-world size and `local_center` once (via `UsdGeom.BBoxCache`) and pl
 regardless of where its native origin sits — you don't need to do anything for this, but if a model looks
 right-sized yet sits oddly high/low or faces sideways, `rot_x_deg` (Y-up vs Z-up) or a bad `local_center`
 measurement is usually why.
-
-### Alternative: point elsewhere entirely
-
-Set the `MARITIME_SCENARIO_MESH_DIR` environment variable to any directory instead of using this one —
-`core/meshes.py` reads that first, falling back to this folder only if it's unset.
 
 ## 2. How buoyancy is applied
 
@@ -68,8 +83,12 @@ model — naval-architecture style, not a simple 4-corner spring rig — impleme
 
 ### Via the UI
 
-Open the extension's panel, pick a registered mesh from the dropdown, choose a behavior (`forward` /
-`backward` / `turn_left` / `turn_right` / `stationary` / `follow_path`), and either click
+**Own ship:** "Build scene" sets up the wave infrastructure and an empty vessel pool, but does NOT spawn
+an own ship by itself. In the **Own Ship** section, pick a mesh from the dropdown and click **"Apply to
+own ship"** — this is also what actually spawns it the first time.
+
+**Vessel traffic:** in the **Vessels** section, pick a registered mesh from the dropdown, choose a
+behavior (`forward` / `backward` / `turn_left` / `turn_right` / `stationary` / `follow_path`), and either click
 **"Place with mouse"** (click a point on the water to spawn there, or for `follow_path`, click multiple
 points — the first is the spawn point, the rest become waypoints, then click **"Finish Path"**), or type a
 position directly and click **"Spawn vessel (typed position)"**. The **"Random swarm count"** field +
@@ -83,9 +102,10 @@ position directly and click **"Spawn vessel (typed position)"**. The **"Random s
 from maritime_scenario import api as scenario
 
 sc = scenario.get_controller()
-await sc.setup_async()                 # builds the wave, own ship, vessel pool -- once per session
+await sc.setup_async()                 # builds the wave infrastructure + empty vessel pool -- once per
+                                        # session; does NOT spawn an own ship by itself
 
-sc.set_own_ship_mesh("boat3")          # pick which registered mesh is the player-controlled ship
+sc.set_own_ship_mesh("boat3")          # spawns the own ship with this mesh (also how you swap it later)
 sc.spawn_vessel("boat1", x=50, y=20, behavior="forward")
 sc.spawn_vessel("boat2", x=-30, y=10, behavior="follow_path",
                  waypoints=[(0, 0), (40, 40), (80, 0)])

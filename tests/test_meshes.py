@@ -53,3 +53,27 @@ def test_list_available_only_includes_existing_files(tmp_path, monkeypatch):
   available = meshes.list_available()
   assert len(available) == 1
   assert available[0].mesh_id == "boat1"
+
+
+# ------------------------------------------------------------ runtime-settable mesh folder (2026-10-31)
+
+def test_set_model_dir_rebuilds_registry_paths(tmp_path, monkeypatch):
+  original_dir = meshes.WEB_MODEL_DIR
+  try:
+    meshes.set_model_dir(str(tmp_path))
+    assert meshes.WEB_MODEL_DIR == str(tmp_path)
+    assert meshes.get("boat1").usd_path == os.path.join(str(tmp_path), "boat1.usd")
+    assert len(meshes.WEB_MESHES) == 13
+  finally:
+    meshes.set_model_dir(original_dir)   # restore -- WEB_MODEL_DIR is module-global state
+
+
+def test_set_model_dir_round_trips_back_to_original(tmp_path):
+  original_dir = meshes.WEB_MODEL_DIR
+  original_path = meshes.get("boat1").usd_path
+  try:
+    meshes.set_model_dir(str(tmp_path))
+    assert meshes.get("boat1").usd_path != original_path
+  finally:
+    meshes.set_model_dir(original_dir)
+  assert meshes.get("boat1").usd_path == original_path

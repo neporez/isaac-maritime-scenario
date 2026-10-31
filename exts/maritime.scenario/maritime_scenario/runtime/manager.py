@@ -115,11 +115,27 @@ class ScenarioManager:
 
   # ------------------------------------------------------------ own ship (delegated to the "ship" backend)
   def set_own_ship_mesh(self, mesh_id):
-    self._require_backend("ship").set_mesh(mesh_id)
+    """Returns True if mesh_id resolved to the fallback placeholder box rather than a real asset -- see
+    ShipBackend.set_mesh()'s own docstring."""
+    return self._require_backend("ship").set_mesh(mesh_id)
 
   def get_own_ship_mesh_id(self):
     backend = self.get_backend("ship")
     return backend.mesh_id if backend is not None else None
+
+  # ------------------------------------------------------------ mesh folder (delegated to core.meshes)
+  def set_mesh_dir(self, path):
+    """Overrides where boat assets are loaded from, at runtime -- see core.meshes.set_model_dir()'s own
+    docstring. Also clears backends.meshes' measured-mesh cache, since mesh_ids now point at different
+    files; this is the one place both of those need to happen together."""
+    from ..backends import meshes as mesh_backend
+    from ..core import meshes as mesh_registry
+    mesh_registry.set_model_dir(path)
+    mesh_backend.clear_cache()
+
+  def get_mesh_dir(self):
+    from ..core import meshes as mesh_registry
+    return mesh_registry.WEB_MODEL_DIR
 
   # ------------------------------------------------------------ save / load
   def save_scenario(self, path):

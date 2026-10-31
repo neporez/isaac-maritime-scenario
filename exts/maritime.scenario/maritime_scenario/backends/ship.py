@@ -73,7 +73,10 @@ class ShipBackend(Backend):
   def set_mesh(self, mesh_id):
     """Rebuilds the visual reference, collider scale/mass/inertia, and heave/roll/pitch K/C/mass/I for
     this mesh, then re-drops the ship at the new equilibrium -- same as float_mesh_test.py's
-    set_mesh_source(), minus the "ours"/web toggle (web-only here)."""
+    set_mesh_source(), minus the "ours"/web toggle (web-only here). Returns True if this mesh_id resolved
+    to the fallback placeholder box (no real boat assets registered) rather than a real asset -- the UI's
+    "Apply to own ship" uses this to surface a warning without build_visual()/mesh_backend having to know
+    anything about the UI."""
     self._measured = mesh_backend.measure(mesh_id)
     self.mesh_id = mesh_id
     coeffs = self.context.manager.state_ref.ship_physics
@@ -89,11 +92,7 @@ class ShipBackend(Backend):
     body_prim = stage.DefinePrim(BODY_PATH, "Xform")
     self._set_xform(body_prim, SPAWN_X, SPAWN_Y, spawn_z, 0.0)
 
-    visual_prim = stage.DefinePrim(VISUAL_PATH, "Xform")
-    visual_prim.GetReferences().ClearReferences()
-    visual_prim.GetReferences().AddReference(self._measured.usd_path)
-    mesh_backend.strip_bad_normals(visual_prim)
-    mesh_backend.set_visual_xform(visual_prim, self._measured)
+    mesh_backend.build_visual(stage, VISUAL_PATH, self._measured)
 
     collider_prim = stage.DefinePrim(COLLIDER_PATH, "Cube")
     UsdGeom.Xformable(collider_prim).AddScaleOp(UsdGeom.XformOp.PrecisionDouble).Set(
@@ -122,6 +121,7 @@ class ShipBackend(Backend):
     self._prev = {"z": None, "roll": None, "pitch": None}
     log.info("maritime_scenario(ship): mesh -> %s  dx=%.2f dy=%.2f dz=%.2f  mass=%.0fkg",
               mesh_id, self._measured.dx, self._measured.dy, self._measured.dz, self._params.mass_kg)
+    return not self._measured.usd_path
 
   def _recompute_physics(self, coeffs):
     """Re-derives mass/K/C/inertia for the CURRENT mesh without re-spawning -- wired to the UI's Ship

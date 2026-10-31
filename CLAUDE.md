@@ -604,21 +604,84 @@ WIRING itself has not been exercised against a running Kit process.
 - `ui/window.py`'s flat list of full-height sections (Setup, Gerstner Wave, Water Tiles, Own Ship, Ship
   Physics, Vessels, Save/Load) meant scrolling past everything just to reach one slider -- compared
   directly against another installed extension's Weather FX panel, which keeps each category compact
-  (one-line collapsed header + a ▼ to expand) so the whole panel reads as a table of contents at a
-  glance. Every section except the top Setup/status/Build bar (which stays a plain always-visible bar,
-  same role Weather FX's own top Preset/Apply row plays) is now wrapped in an `omni.ui.CollapsableFrame`.
-  Collapsed by default: Water Tiles (already labeled "advanced"), Ship Physics (fine-tuning, not needed
-  immediately), Save/Load (occasional use). Expanded by default: Gerstner Wave, Own Ship, Vessels -- the
-  three sections the two-step workflow above actually walks through in one session. Each section's old
-  centered `ui.Label(title, font_size=16)` header was removed (the CollapsableFrame supplies its own
-  title now); Ship Physics' explanatory aside ("applies to the own ship AND every vessel") moved from
-  that removed title into a small gray body label instead of being lost. NOT yet confirmed live (same
-  standing caveat as the rest of this UI) whether `CollapsableFrame` renders/collapses the way this
-  assumes in this project's actual Kit/Isaac Sim version.
+  (one-line collapsed header + a ▼ to expand, label and slider on the SAME row) so the whole panel reads
+  as a table of contents at a glance. Every section except the top Setup/status/Build bar (which stays a
+  plain always-visible bar, same role Weather FX's own top Preset/Apply row plays) is now wrapped in an
+  `omni.ui.CollapsableFrame`; each section's old centered `ui.Label(title, font_size=16)` header was
+  removed (the CollapsableFrame supplies its own title). NOT yet confirmed live (same standing caveat as
+  the rest of this UI) whether `CollapsableFrame` renders/collapses the way this assumes in this
+  project's actual Kit/Isaac Sim version.
+
+**Second pass the same day, after seeing it rendered as a screenshot (2026-10-31): all explanatory
+prose removed from the panel, sliders made single-row, sections reordered/trimmed to match the asset
+guide's two-step workflow, and boat assets get a UI folder picker + a placeholder-box fallback.**
+User's framing: the long gray-text explanations belong in the GitHub README/guide (already being
+written), not live in the panel -- a real app's settings UI doesn't carry paragraphs. Specific changes:
+- `_wave_slider()`/`_physics_slider()`: label + slider + value now share one `ui.HStack` row (label at a
+  fixed `width=150`) instead of the label sitting on its own line above the slider.
+- Every multi-line gray explanatory `ui.Label` (what "Build scene" does, what active radius means, the
+  tile power-of-2/coarsening rules, I/J/K/L controls, waypoint syntax, etc.) was deleted outright -- the
+  controls themselves (and their one-word field labels, e.g. "Mesh", "Behavior", "X (m)") are all that's
+  left; CLAUDE.md and the upcoming README are now the only place that prose lives.
+- The classic single-plane water path was dropped from the UI entirely: the "Build default wave plane"
+  button and the Size(m)/Resolution(points/side) sliders that fed it are gone from `_build_wave_section()`
+  (user: "기본 플레인 생성하는것도 그냥 지우자" -- tile-based water, below, is now the only UI-driven way to
+  build water). `ScenarioController.set_wave_single_plane()` itself is UNCHANGED and still callable from
+  a script -- only its dedicated UI button was removed, not the underlying capability.
+- Section order now matches the asset guide's own two-step structure: **Water Tiles** (renamed from
+  "Water Tiles (advanced)", now collapsed=False like everything else below it -- it's the primary way to
+  build water now, not an advanced/optional path) -> **Own Ship** -> **Vessels** -> **Ship Physics**
+  (collapsed=True, fine-tuning) -> **Gerstner Wave** (sea-state sliders + active radius, moved from first
+  to last) -> **Save/Load** (collapsed=True, occasional use).
+
+**Boat assets folder is now a UI control, with a placeholder-box fallback (2026-10-31).** Previously the
+only way to point the extension at boat models was the `MARITIME_SCENARIO_MESH_DIR` env var (set before
+Isaac Sim even starts) or dropping files into `assets/models/` directly. User wanted a live "Choose
+folder..." button instead, plus a sane default when no assets exist yet rather than a dead/empty picker:
+- `core/meshes.py`'s `WEB_MODEL_DIR`/`WEB_MESHES`/`_BY_ID` became mutable module state with a new
+  `set_model_dir(path)` that rebuilds them against a new folder at runtime (previously computed once at
+  import time) -- the existing env-var-or-default resolution still seeds the INITIAL value, this just
+  adds a way to change it afterward. Existing tests (`test_web_model_dir_not_hardcoded_to_one_machine`
+  etc.) already monkeypatched `WEB_MODEL_DIR`/`WEB_MESHES` directly, so they needed no changes.
+- `backends/meshes.py` grew `clear_cache()` (the per-process measured-mesh cache assumed files never
+  change mid-session -- no longer true once the folder itself can change), `FALLBACK_MESH_ID`/
+  `fallback_measured()` (a synthetic `MeasuredMesh` with `usd_path=""` and generic elongated-box
+  proportions, `dx=8.0, dy=2.5, dz=1.8`, no pxr touched), and `build_visual(stage, path, measured)` -- a
+  new shared helper (`ship.py`'s `set_mesh()` and `vessels.py`'s `_spawn_prim()` both previously
+  duplicated the same reference+strip-normals+xform sequence inline; consolidating it here meant the
+  fallback branch only had to be written once) that defines either a real USD reference (unchanged
+  behavior) or, when `measured.usd_path` is empty, a plain `UsdGeom.Cube` scaled to the fallback's real
+  dx/dy/dz with a hull-brown display color. `list_all()` now NEVER returns empty: falls back to
+  `[fallback_measured()]` alone instead of `[]`, so the UI's mesh dropdown and `VesselsBackend.set_count()`
+  always have something to work with (the old `set_count()` early-return on an empty mesh pool became
+  dead code and was removed).
+- `ShipBackend.set_mesh()` now returns `True` when it resolved to the fallback (propagated through
+  `ScenarioManager.set_own_ship_mesh()` and `ScenarioController.set_own_ship_mesh()`) so the UI's "Apply
+  to own ship" can show a warning in the status line without `backends/meshes.py` needing to know
+  anything about the UI. Vessel spawning (`spawn_vessel`/`set_vessel_count`) doesn't thread a flag back
+  the same way -- the UI instead tracks `self._no_real_assets` (set whenever `_refresh_mesh_choices()`
+  runs, true exactly when the mesh picker's only option is the fallback) and checks it before any vessel-
+  spawn action, which is equivalent since the fallback is the ONLY choice on offer in that case anyway.
+  `ScenarioController` grew `set_mesh_dir(path)`/`get_mesh_dir()`, delegating to
+  `ScenarioManager.set_mesh_dir()` (which calls `core.meshes.set_model_dir()` then
+  `backends.meshes.clear_cache()` together, the one place both need to happen) and
+  `core.meshes.WEB_MODEL_DIR` respectively.
+- `ui/window.py`'s "Choose folder..." button uses `omni.kit.window.filepicker.FilePickerDialog`
+  (`click_apply_handler`, folder-only selection by navigating in then clicking Select without picking a
+  file, so the callback's `dirname` is the chosen folder). **NOT yet confirmed live** -- same standing
+  caveat as every other Kit-API-dependent piece of this UI (mouse/keyboard event wiring, now
+  `CollapsableFrame` too) -- whether this exact filepicker API/usage is correct for this project's
+  installed Kit version; try it live and fix the call if it isn't.
+- New tests: `tests/test_meshes.py` (`set_model_dir` rebuilds paths and round-trips back),
+  `tests/test_backend_meshes.py` (new file -- `fallback_measured()`'s shape, `measure()` routing to it
+  for `FALLBACK_MESH_ID`, `build_visual()` producing a correctly-scaled `Cube` for the fallback case AND
+  switching cleanly from fallback to a real reference on the same prim path, `clear_cache()`,
+  `list_all()`'s fallback-when-empty behavior) -- 110 tests total now, all against real pxr (no stubs),
+  same pattern as `test_wave_backend_tiles.py`.
 
 ## Current status (as of 2026-10-30)
 
-Everything above is built: `core/` + `backends/wave.py`'s tile registry (102 passing tests total),
+Everything above is built: `core/` + `backends/wave.py`'s tile registry (110 passing tests total),
 `runtime/manager.py`, all three backends, `api.py`, `extension.py`, `ui/window.py`, `ui/placement.py`,
 `ui/tile_placement.py`. Verified so far: `core/`'s pure-Python logic (real pytest, including a regression
 test for the model-path portability bug and the wave-tiling phase-consistency math), every file
