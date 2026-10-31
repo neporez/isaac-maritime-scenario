@@ -18,6 +18,8 @@ log = logging.getLogger("maritime_scenario")
 
 
 class ScenarioManager:
+  DEFAULT_LIGHT_PATH = "/World/DefaultLight"   # see ensure_default_light()'s own docstring
+
   def __init__(self):
     self._state = ScenarioState()
     self._backends = {}
@@ -52,26 +54,33 @@ class ScenarioManager:
     self.ready = True
     log.info("maritime_scenario: setup complete -- press Play")
 
-  @staticmethod
-  def ensure_default_light(stage):
-    """Adds a plain DomeLight at /World/DefaultLight if the stage has no light at all yet (2026-11-04,
+  @classmethod
+  def ensure_default_light(cls, stage):
+    """Adds a plain DomeLight at DEFAULT_LIGHT_PATH if the stage has no light at all yet (2026-11-04,
     user's own call: a brand-new/empty stage has nothing lighting it, so the whole scene -- water, boats,
     the fallback placeholder box -- renders invisible, which reads as "the extension is broken" rather
     than "the stage is unlit"). DomeLight (even ambient light from every direction) rather than
-    DistantLight (a single directional sun, which was tried first -- 2026-11-04 -- and would leave some
-    sides of a boat dark depending on its heading) so the scene reads clearly from any angle without
-    needing to also think about sun direction. Checks for ANY existing light first via UsdLux.LightAPI
-    (every concrete light type -- DistantLight, DomeLight, etc. -- auto-applies it), so this never
-    duplicates or fights a light the user already added, or isaac-weather-fx's own sun/moon/sky if that
-    sibling extension is active and already set up first -- this project deliberately leaves full
-    sky/lighting control to that extension; this is only a minimal fallback for when neither exists.
-    Called BEFORE WaveBackend.setup_async()'s save-as-stage+reopen restart, specifically so the light
-    survives that save and isn't lost."""
+    DistantLight (a single directional sun, tried first -- would leave some sides of a boat dark
+    depending on its heading) so the scene reads clearly from any angle without needing to also think
+    about sun direction.
+
+    If DEFAULT_LIGHT_PATH exists but ISN'T a DomeLight, it's a stale light from an earlier version of
+    this function (found live, 2026-11-04: switching DistantLight -> DomeLight in code did nothing for a
+    stage that already had the old DistantLight sitting at this exact path from a previous "Build scene"
+    -- the "does ANY light exist" check below saw it and skipped, forever) -- removed and replaced rather
+    than left behind. Any OTHER light (a different path, e.g. one the user added themselves, or
+    isaac-weather-fx's own sun/moon/sky) is left completely alone; this project deliberately leaves full
+    sky/lighting control to that extension, this is only a minimal fallback for when neither it nor the
+    user has set anything up. Called BEFORE WaveBackend.setup_async()'s save-as-stage+reopen restart,
+    specifically so the light survives that save and isn't lost."""
     from pxr import Usd, UsdLux
+    existing_default = stage.GetPrimAtPath(cls.DEFAULT_LIGHT_PATH)
+    if existing_default and existing_default.GetTypeName() != "DomeLight":
+      stage.RemovePrim(cls.DEFAULT_LIGHT_PATH)
     for prim in Usd.PrimRange(stage.GetPseudoRoot()):
       if prim.HasAPI(UsdLux.LightAPI):
         return
-    light = UsdLux.DomeLight.Define(stage, "/World/DefaultLight")
+    light = UsdLux.DomeLight.Define(stage, cls.DEFAULT_LIGHT_PATH)
     light.CreateIntensityAttr(1000.0)
     log.info("maritime_scenario: no light found in the stage -- added a default DomeLight")
 
