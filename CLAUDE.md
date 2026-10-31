@@ -1014,6 +1014,22 @@ screenshot-driven pages (2026-11-04).**
   `authors`/`repository` placeholders (`<your name>`/`<you>`) were also filled in (`neporez` / the real
   repo URL) as part of actually publishing this.
 
+**README restyled after `isaac-weather-fx`'s own README, on request (2026-11-04).** User: "readme좀
+weather fx 쪽 보고 잘 꾸며봐" -- that sibling project's README (read directly from
+`/home/rain/isaac-weather-fx/README.md`, present on this machine) uses a centered hero header, a feature
+table (`| | How it works | Main controls |`) instead of a bullet list, screenshots embedded in an HTML
+`<table>` with captions underneath each image rather than bare consecutive markdown images, and a
+`## Documentation` table linking out to its own `docs/GUIDE.md`/`ARCHITECTURE.md`/`LIMITATIONS.md`. Our
+`README.md` now mirrors each of these: the "Features" bullets became the same 3-column table shape, the
+"Screenshots" section became an HTML image table, and the "How to use" numbered steps were dropped
+entirely in favor of a `## Documentation` table pointing at `docs/water-and-waves.md`,
+`assets/models/README.md`, and `CLAUDE.md` -- matching that `isaac-weather-fx` itself has no step-by-step
+usage walkthrough in its own README either, relying on its linked guide docs for that instead. Also
+consolidated the top-level screenshot folder from a separate root `images/` into `docs/images/`
+(`isaac-weather-fx` keeps all its own README images under `docs/images/` too) -- `assets/models/`'s own
+images stay where they were, since that guide's screenshots are specific to it, same as `isaac-weather-fx`
+not centralizing every image across every doc into one folder either.
+
 ## Current status (as of 2026-10-30)
 
 Everything above is built: `core/` + `backends/wave.py`'s tile registry (136 passing tests total),
