@@ -37,6 +37,8 @@ class ScenarioManager:
     from ..backends.vessels import VesselsBackend
     from ..backends.wave import WaveBackend
 
+    self.ensure_default_light(self.context.stage())
+
     if "wave" not in self._backends:
       self.register_backend(WaveBackend())
     await self.get_backend("wave").setup_async()
@@ -49,6 +51,26 @@ class ScenarioManager:
     self.get_backend("vessels").build()
     self.ready = True
     log.info("maritime_scenario: setup complete -- press Play")
+
+  @staticmethod
+  def ensure_default_light(stage):
+    """Adds a plain DistantLight at /World/DefaultLight if the stage has no light at all yet (2026-11-04,
+    user's own call: a brand-new/empty stage has nothing lighting it, so the whole scene -- water, boats,
+    the fallback placeholder box -- renders invisible, which reads as "the extension is broken" rather
+    than "the stage is unlit"). Checks for ANY existing light first via UsdLux.LightAPI (every concrete
+    light type -- DistantLight, DomeLight, etc. -- auto-applies it), so this never duplicates or fights a
+    light the user already added, or isaac-weather-fx's own sun/moon/sky if that sibling extension is
+    active and already set up first -- this project deliberately leaves full sky/lighting control to that
+    extension; this is only a minimal fallback for when neither exists. Called BEFORE
+    WaveBackend.setup_async()'s save-as-stage+reopen restart, specifically so the light survives that
+    save and isn't lost."""
+    from pxr import Usd, UsdLux
+    for prim in Usd.PrimRange(stage.GetPseudoRoot()):
+      if prim.HasAPI(UsdLux.LightAPI):
+        return
+    light = UsdLux.DistantLight.Define(stage, "/World/DefaultLight")
+    light.CreateIntensityAttr(1000.0)
+    log.info("maritime_scenario: no light found in the stage -- added a default DistantLight")
 
   # ------------------------------------------------------------ state
   @property
