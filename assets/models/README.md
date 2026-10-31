@@ -5,6 +5,15 @@ third-party web-sourced assets of unclear license, so they can't be redistribute
 everything you need to bring your own: how the mesh registry works, how a boat actually floats once it's
 in the scene, and how to get one onto the water (via the UI or the Python API).
 
+## Credits
+
+The boat shown in this guide's screenshots:
+
+> Boat model: "Survey Boat" by gogiart (@agt14032013),
+> https://sketchfab.com/3d-models/survey-boat-eecb4fab9fa3442d86869ac4369874e0,
+> licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/).
+> Scaled and re-textured for simulation.
+
 ## 1. Registering your own USD asset
 
 ### Pointing the extension at your assets folder

@@ -101,6 +101,12 @@ class ScenarioController:
     Any arg can be omitted to leave that one unchanged."""
     self._manager.set_ship_spawn_position(x=x, y=y, z=z)
 
+  def set_ship_area_boundary(self, enabled: bool) -> None:
+    """When enabled (the default), the own ship reaching the edge of the placed water (or +/-
+    general.area_m if no water tile is placed at all) is held there -- an invisible wall, same mechanism
+    as set_vessel_area_boundary()."""
+    self._manager.set_ship_area_boundary(enabled)
+
   def ship_reset(self) -> None:
     backend = self._manager.get_backend("ship")
     if backend is not None:

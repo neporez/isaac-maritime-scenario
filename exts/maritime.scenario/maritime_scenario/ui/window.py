@@ -69,7 +69,7 @@ class ScenarioWindow:
           with ui.CollapsableFrame("Ship Physics", height=0, collapsed=True):
             with ui.VStack(spacing=3, style={"margin": 6}):
               self._build_ship_physics_section()
-          with ui.CollapsableFrame("Gerstner Wave", height=0, collapsed=False):
+          with ui.CollapsableFrame("Gerstner Wave", height=0, collapsed=True):
             with ui.VStack(spacing=3, style={"margin": 6}):
               self._build_wave_section()
           with ui.CollapsableFrame("Save / Load Scenario", height=0, collapsed=True):

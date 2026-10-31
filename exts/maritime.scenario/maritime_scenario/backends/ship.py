@@ -57,6 +57,9 @@ class ShipBackend(Backend):
     self._spawn_x = SPAWN_X
     self._spawn_y = SPAWN_Y
     self._spawn_z = DROP_HEIGHT_M
+    # Invisible wall at the edge of the placed water (2026-11-02, user's own call) -- see _on_update()'s
+    # own comment for the full mechanism; same default-on convention as VesselsBackend._boundary_enabled.
+    self._boundary_enabled = True
     self._update_sub = None
     self._keyboard_sub = None
 
@@ -215,6 +218,10 @@ class ShipBackend(Backend):
     if z is not None:
       self._spawn_z = float(z)
 
+  def set_boundary_enabled(self, flag):
+    self._boundary_enabled = bool(flag)
+    log.info("maritime_scenario(ship): area boundary %s", "enabled" if flag else "disabled")
+
   @staticmethod
   def _set_xform(prim, x, y, z, yaw_deg):
     from pxr import Gf, UsdGeom
@@ -324,3 +331,15 @@ class ShipBackend(Backend):
 
     PhysxSchema.PhysxForceAPI(body).GetForceAttr().Set(Gf.Vec3f(fx, fy, fz))
     PhysxSchema.PhysxForceAPI(body).GetTorqueAttr().Set(Gf.Vec3f(tx, ty, tz))
+
+    if self._boundary_enabled:
+      area = self.context.manager.state_ref.general.area_m
+      clamped_x, clamped_y = ship_motion.clamp_to_bounds(pos[0], pos[1], wave_backend.get_bounds(), area)
+      if clamped_x != pos[0] or clamped_y != pos[1]:
+        # Invisible wall at the edge of the actual placed water, not a teleport -- same mechanism and
+        # reasoning as vessels.py's own boundary (2026-11-02, user's own call: "자선도 나는 막히기를
+        # 바라고 있고" -- the own ship never had ANY boundary before this, unlike vessels which at least
+        # had a (now-replaced) wraparound). prev z/roll/pitch stay untouched since this only ever moves
+        # the body a tiny amount back to the boundary, not a long-distance jump.
+        yaw_deg = world_tf.ExtractRotation().Decompose(Gf.Vec3d(1, 0, 0), Gf.Vec3d(0, 1, 0), Gf.Vec3d(0, 0, 1))[2]
+        self._set_xform(body, clamped_x, clamped_y, pos[2], yaw_deg)

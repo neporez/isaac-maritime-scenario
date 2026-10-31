@@ -136,3 +136,15 @@ def test_path_steer_yaw_wraps_correctly_near_180():
   steer, desired_yaw = ship_motion.path_steer(
     x=0.0, y=0.0, current_yaw_deg=179.0, waypoint_xy=(-1.0, -0.035), prev_yaw_deg=None, dt=1 / 60)
   assert abs(steer) < 0.2   # small correction, not saturated at 1.0
+
+
+def test_clamp_to_bounds_holds_position_at_the_edge_of_given_bounds():
+  # inside the bounds -> unchanged
+  assert ship_motion.clamp_to_bounds(10.0, 10.0, (-50.0, 50.0, -50.0, 50.0), fallback_area=200.0) == (10.0, 10.0)
+  # past every edge -> clamped to that edge, independently per axis
+  assert ship_motion.clamp_to_bounds(100.0, -100.0, (-50.0, 50.0, -50.0, 50.0), fallback_area=200.0) == (50.0, -50.0)
+
+
+def test_clamp_to_bounds_falls_back_to_a_square_when_bounds_is_none():
+  assert ship_motion.clamp_to_bounds(10.0, 10.0, None, fallback_area=50.0) == (10.0, 10.0)
+  assert ship_motion.clamp_to_bounds(1000.0, -1000.0, None, fallback_area=50.0) == (50.0, -50.0)

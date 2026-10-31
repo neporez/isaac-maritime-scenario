@@ -133,6 +133,11 @@ class ScenarioManager:
     if backend is not None:
       backend.set_spawn_position(x=x, y=y, z=z)
 
+  def set_ship_area_boundary(self, enabled):
+    backend = self.get_backend("ship")
+    if backend is not None:
+      backend.set_boundary_enabled(enabled)
+
   # ------------------------------------------------------------ mesh folder (delegated to core.meshes)
   def set_mesh_dir(self, path):
     """Overrides where boat assets are loaded from, at runtime -- see core.meshes.set_model_dir()'s own

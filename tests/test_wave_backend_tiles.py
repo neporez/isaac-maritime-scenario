@@ -224,6 +224,29 @@ def test_list_tiles_returns_a_copy_not_the_live_dict():
   assert wb.tiles["main"] != "mutated"
 
 
+def test_get_bounds_returns_none_with_no_tiles():
+  params = gerstner.WaveParams()
+  wb, _ = _make_backend(params)
+  assert wb.get_bounds() is None
+
+
+def test_get_bounds_matches_a_single_tiles_footprint():
+  params = gerstner.WaveParams(resolution=5, size_m=40.0)
+  wb, _ = _make_backend(params)
+  wb.set_layout([gerstner.WaveTileSpec("main", 100.0, -50.0, 40.0, 5)])
+  assert wb.get_bounds() == (80.0, 120.0, -70.0, -30.0)
+
+
+def test_get_bounds_covers_the_union_of_multiple_differently_sized_tiles():
+  params = gerstner.WaveParams(resolution=5, size_m=40.0)
+  wb, _ = _make_backend(params)
+  wb.set_layout([
+    gerstner.WaveTileSpec("a", 0.0, 0.0, 40.0, 5),      # [-20, 20] x [-20, 20]
+    gerstner.WaveTileSpec("b", 500.0, 500.0, 100.0, 5),  # [450, 550] x [450, 550]
+  ])
+  assert wb.get_bounds() == (-20.0, 550.0, -20.0, 550.0)
+
+
 def test_setup_async_rebuild_reuses_current_layout_not_the_default():
   # setup_async()'s own docstring promise: a second call (e.g. a UI "Rebuild" button) rebuilds whatever
   # layout is CURRENTLY configured, not silently reset back to the single-tile default. This test

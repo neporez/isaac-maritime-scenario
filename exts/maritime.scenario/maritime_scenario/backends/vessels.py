@@ -351,16 +351,19 @@ class VesselsBackend(Backend):
       if not self._boundary_enabled:
         continue
       area = self.context.manager.state_ref.general.area_m
-      clamped_x = max(-area, min(area, pos[0]))
-      clamped_y = max(-area, min(area, pos[1]))
+      clamped_x, clamped_y = ship_motion.clamp_to_bounds(pos[0], pos[1], wave_backend.get_bounds(), area)
       if clamped_x != pos[0] or clamped_y != pos[1]:
         # Invisible wall, not a teleport (2026-11-02, replacing the old wraparound -- user, live: "그냥
         # 벽에 박아서 이동못하는 듯한 연출처럼", a boat that's run into the edge should look stuck there,
-        # not jump to the far side). Holding x/y at the boundary while leaving prev_z/prev_roll/prev_pitch
-        # untouched (unlike the old wraparound's reset, which was needed there specifically because
-        # teleporting a long distance would otherwise read back as a bogus huge z/roll/pitch-rate spike)
-        # keeps heave/roll/pitch continuous -- the hull still bobs on the wave normally, it just can't
-        # progress past the edge. Thrust keeps being applied into the wall every frame (untouched above),
-        # which is what gives the "straining against it, pushed from behind" look rather than a clean stop.
+        # not jump to the far side), at the edge of the ACTUAL placed water
+        # (WaveBackend.get_bounds()) -- not the separate general.area_m value, which has no connection
+        # to what's actually been built (same live follow-up: "지금 깔려있는 타일 기준으로 막힌게 한거
+        # 맞아?" -- it wasn't, yet, this fixes that). Holding x/y at the boundary while leaving
+        # prev_z/prev_roll/prev_pitch untouched (unlike the old wraparound's reset, which was needed
+        # there specifically because teleporting a long distance would otherwise read back as a bogus
+        # huge z/roll/pitch-rate spike) keeps heave/roll/pitch continuous -- the hull still bobs on the
+        # wave normally, it just can't progress past the edge. Thrust keeps being applied into the wall
+        # every frame (untouched above), which is what gives the "straining against it, pushed from
+        # behind" look rather than a clean stop.
         yaw_deg = world_tf.ExtractRotation().Decompose(Gf.Vec3d(1, 0, 0), Gf.Vec3d(0, 1, 0), Gf.Vec3d(0, 0, 1))[2]
         self._set_xform(body, clamped_x, clamped_y, pos[2], yaw_deg)

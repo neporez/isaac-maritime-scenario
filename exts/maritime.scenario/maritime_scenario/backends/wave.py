@@ -169,6 +169,24 @@ class WaveBackend(Backend):
   def list_tiles(self):
     return dict(self.tiles)
 
+  def get_bounds(self):
+    """Axis-aligned bounding box (min_x, max_x, min_y, max_y) covering every currently PLACED tile's
+    footprint, or None if no tile exists -- "the edge of the water" that ship.py/vessels.py's boundary
+    wall and vessels.py's random-swarm spawning both want, instead of the separate general.area_m value
+    (which has no actual connection to what's been built: 2026-11-02, user's own call, live --
+    "지금 깔려있는 타일 기준으로 막힌게 한거 맞아?"). A simple bounding box, not a per-tile-precise shape --
+    good enough for "don't sail off the edge of the water", same simplification random-swarm spawning
+    makes for ITS OWN precision (that one samples per-tile for accuracy since dry-land spawns are a worse
+    failure mode than a slightly-generous wall; a wall merely being a bit bigger than a sparse/irregular
+    layout's exact footprint is a much smaller issue)."""
+    if not self.tiles:
+      return None
+    xs_min = [spec.center_x - spec.size_m / 2.0 for spec in self.tiles.values()]
+    xs_max = [spec.center_x + spec.size_m / 2.0 for spec in self.tiles.values()]
+    ys_min = [spec.center_y - spec.size_m / 2.0 for spec in self.tiles.values()]
+    ys_max = [spec.center_y + spec.size_m / 2.0 for spec in self.tiles.values()]
+    return min(xs_min), max(xs_max), min(ys_min), max(ys_max)
+
   def generate_tile_id(self, prefix="tile"):
     """A fresh tile_id not already in self.tiles -- the UI/API layer calls this before constructing a
     new WaveTileSpec (frozen, so it needs its id up front, unlike set_layout()'s callers which build

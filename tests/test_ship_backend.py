@@ -43,3 +43,12 @@ def test_set_spawn_position_with_no_args_changes_nothing():
   backend.set_spawn_position()
   assert (backend._spawn_x, backend._spawn_y, backend._spawn_z) == (
     ship_backend.SPAWN_X, ship_backend.SPAWN_Y, ship_backend.DROP_HEIGHT_M)
+
+
+def test_boundary_enabled_defaults_true_and_is_toggleable():
+  backend = ship_backend.ShipBackend()
+  assert backend._boundary_enabled is True
+  backend.set_boundary_enabled(False)
+  assert backend._boundary_enabled is False
+  backend.set_boundary_enabled(True)
+  assert backend._boundary_enabled is True

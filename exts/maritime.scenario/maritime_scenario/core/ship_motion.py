@@ -153,6 +153,19 @@ def clamp_vector_length(vx, vy, vz, max_length):
   return vx * scale, vy * scale, vz * scale
 
 
+def clamp_to_bounds(x, y, bounds, fallback_area):
+  """Clamps (x, y) to `bounds` (min_x, max_x, min_y, max_y) if given, else to the square
+  [-fallback_area, fallback_area] on both axes -- the shared "invisible wall" math both ship.py's and
+  vessels.py's per-frame updates use (2026-11-02) so a boat can't sail past the edge of the actual placed
+  water (WaveBackend.get_bounds()), falling back to the separate general.area_m square only while no
+  water tile is placed at all yet."""
+  if bounds is not None:
+    min_x, max_x, min_y, max_y = bounds
+  else:
+    min_x, max_x, min_y, max_y = -fallback_area, fallback_area, -fallback_area, fallback_area
+  return max(min_x, min(max_x, x)), max(min_y, min(max_y, y))
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # follow_path steering -- PD controller on yaw error, extracted from other_boats.py's _on_ob_update()
 # follow_path block. Pure math: given the current pose/waypoint, returns a steer value in [-1, 1] (0 =

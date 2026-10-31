@@ -896,9 +896,55 @@ produces a smooth "stuck at the wall, still bobbing" look rather than any visibl
 reasoning holds analytically, but this is exactly the kind of per-frame interaction this project's other
 notes repeatedly flag as needing a real session to confirm.
 
+**Follow-up, same day: the wall wasn't tied to the actual water, and the own ship got one too
+(2026-11-02).** User tested live: vessels still sailed through "완전히 저항 없이" (with zero resistance) --
+and asked directly, "지금 깔려있는 타일 기준으로 막힌게 한거 맞아?" (is the block actually based on the
+currently-placed tiles?). It wasn't: the wall used `general.area_m`, a SEPARATE value (default 200m) with
+no connection to whatever water tiles are actually placed -- the exact same disconnect the previous
+round's random-spawn-within-tiles fix addressed for spawning, just not yet applied to the boundary wall
+too. Fixed the same way: new `WaveBackend.get_bounds()` returns the axis-aligned bounding box
+`(min_x, max_x, min_y, max_y)` of every currently placed tile (or `None` if none), and a new shared
+`core.ship_motion.clamp_to_bounds(x, y, bounds, fallback_area)` clamps to those bounds if given, else to
+the old `[-general.area_m, +general.area_m]` square -- used by both `vessels.py`'s boundary block (now
+`wave_backend.get_bounds()` instead of a bare `area_m` square) and `ship.py`'s brand new one. A bounding
+box, not a per-tile-precise shape -- deliberately simpler than the random-spawn fix's per-tile sampling,
+since a wall being a bit more generous than a sparse/irregular layout's exact footprint is a much smaller
+problem than a dry-land spawn.
+
+Own ship also gained its own invisible wall (`self._boundary_enabled`, default `True`,
+`set_boundary_enabled()`/`ScenarioController.set_ship_area_boundary()`) -- it previously had NO area
+boundary of any kind (could sail forever), unlike vessels which at least had a wraparound to replace;
+user, live: "자선도 나는 막히기를 바라고 있고" (I want the own ship blocked too). Same mechanism as
+vessels.py's wall: clamp x/y after force application, leave `prev["z"/"roll"/"pitch"]` untouched.
+
+New tests: `WaveBackend.get_bounds()` (`tests/test_wave_backend_tiles.py` -- none/single-tile/multi-tile-
+union cases), `core.ship_motion.clamp_to_bounds()` (`tests/test_ship_motion.py`), `ShipBackend`'s
+`_boundary_enabled` default/toggle (`tests/test_ship_backend.py`). 131 tests total now.
+
+On the "zero resistance" report specifically: tying the wall to real tile bounds is the most likely real
+fix (if `general.area_m` stayed at its 200m default while a much bigger tile was placed and tested, the
+OLD wall would've been well inside the visible water, or the user simply hadn't reached it yet at the
+point they judged it "passes through"). A secondary, NOT separately confirmed possibility worth ruling
+out live: Python attribute renames (`_wraparound_enabled` -> `_boundary_enabled`, the previous round) only
+take effect on a FRESH backend instance -- if Isaac Sim hot-reloaded this extension's code without fully
+restarting/rebuilding the scene, an already-existing `VesselsBackend` object from before the rename would
+be missing the new attribute entirely, and `_on_update()` would raise `AttributeError` on the boundary
+check every frame (after thrust/motion, which runs first and would keep working normally) -- consistent
+with "normal movement, zero wall resistance." A full restart or at least a fresh "Build scene" after
+pulling new code rules this out; not something fixable from the code side.
+
+**Also this round:** "Gerstner Wave" `CollapsableFrame` now defaults to `collapsed=True` (every other
+section besides Water Tiles/Own Ship/Vessels already did; user: wanted it collapsed by default too).
+`assets/models/README.md` gained a "Credits" section with the CC BY 4.0 attribution for the one boat model
+the user is using for this guide's screenshots (a licensed Sketchfab asset, chosen specifically so the
+public screenshots don't involve any of the ambiguously-licensed web-sourced models `core/meshes.py` was
+originally built against) -- the actual `.usd` file itself is NOT bundled in the repo (same policy as
+every other model), this is just the attribution text required by the license, next to where the
+screenshots that used it will appear.
+
 ## Current status (as of 2026-10-30)
 
-Everything above is built: `core/` + `backends/wave.py`'s tile registry (125 passing tests total),
+Everything above is built: `core/` + `backends/wave.py`'s tile registry (131 passing tests total),
 `runtime/manager.py`, all three backends, `api.py`, `extension.py`, `ui/window.py`, `ui/placement.py`,
 `ui/tile_placement.py`. Verified so far: `core/`'s pure-Python logic (real pytest, including a regression
 test for the model-path portability bug and the wave-tiling phase-consistency math), every file
