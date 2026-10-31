@@ -323,6 +323,7 @@ class ScenarioWindow:
       ui.Label("Angular", width=55)
       self._angular_field = ui.FloatField(height=24)
       self._angular_field.model.set_value(0.01)
+      ui.Label("([ / ] rotate while placing)", style={"color": 0xFF888888})
 
     with ui.HStack(spacing=6):
       ui.Button("Place with mouse", height=30, clicked_fn=self._on_place_with_mouse)

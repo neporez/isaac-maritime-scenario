@@ -708,11 +708,20 @@ buttons, a lower default draft, "Build scene" moved to the top (2026-10-31).**
   something other than WASD" and to expose the same control as UI buttons -- I/J/K/L (`backends/ship.py`,
   unchanged) already satisfies "not WASD" and was already fully wired, just no longer visible anywhere in
   the UI after the previous round stripped its explanatory label; this round re-surfaces it (as a button
-  label, not a paragraph) instead of re-deriving a new key scheme. The turn keys (J/L) are written
-  directly on the Left/Right button labels themselves, satisfying "write the rotation key next to the
-  control" without a separate explanatory line. **NOT yet confirmed live** (same standing caveat as every
-  other Kit-API-dependent piece of this UI) whether `set_mouse_pressed_fn`/`set_mouse_released_fn`'s
-  `(x, y, button, modifier)` callback signature is exactly right for this project's installed Kit version.
+  label, not a paragraph) instead of re-deriving a new key scheme. **NOT yet confirmed live** (same
+  standing caveat as every other Kit-API-dependent piece of this UI) whether
+  `set_mouse_pressed_fn`/`set_mouse_released_fn`'s `(x, y, button, modifier)` callback signature is
+  exactly right for this project's installed Kit version.
+- Correction, same conversation: "선박 회전하는 키정도는 angular 옆에 써두는게 좋을 것 같고" was initially
+  (mis)read as "label the own-ship turn buttons with their keys" (addressed above) -- the user clarified
+  it actually meant the VESSEL-placement "[ / ] also nudge yaw by Step" hint, which the second-pass
+  prose-stripping round had deleted outright along with everything else, should come back as a short
+  comment next to the Vessels section's "Angular" field specifically (not the own ship at all). Restored
+  as a single inline label right after the Angular field on the same row: `"([ / ] rotate while
+  placing)"` -- compact, matching this round's own "no paragraphs" rule, placed exactly where asked
+  rather than where it's most mechanically related (the actual yaw-nudge-while-placing behavior is tied
+  to the Yaw/Step fields below, not Angular, which is the vessel's autonomous turning SPEED -- but the
+  user asked for it beside Angular specifically, so that's where it went).
 
 ## Current status (as of 2026-10-30)
 
