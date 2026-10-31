@@ -1,0 +1,27 @@
+# 3D model assets -- never bundled, see assets/models/README.md
+assets/models/*.usd
+assets/models/*.usda
+assets/models/*.usdc
+assets/models/*.usdz
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+
+# Isaac Sim / Kit
+_restart_scratch.usd
+*.log
+.nvidia-omniverse/
+
+# IDE / OS junk (none present yet, but cheap to exclude up front)
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+
+# Local env/secrets, never committed
+.env
+.env.*

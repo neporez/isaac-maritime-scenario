@@ -1,0 +1,22 @@
+[package]
+version = "0.1.0"
+title = "Maritime Scenario"
+description = "Maritime scenario building for Isaac Sim: waves, a controllable own ship, and other-vessel traffic, with a UI panel and a Python API."
+category = "Simulation"
+keywords = ["maritime", "boat", "wave", "scenario", "synthetic data", "isaac sim"]
+authors = ["<your name>"]
+repository = "https://github.com/<you>/isaac-maritime-scenario"
+readme = "docs/README.md"
+changelog = "docs/CHANGELOG.md"
+
+[dependencies]
+"omni.kit.uiapp" = {}
+"omni.usd" = {}
+"omni.kit.viewport.utility" = {}
+"omni.kit.menu.utils" = {}
+
+[[python.module]]
+name = "maritime_scenario"
+
+[settings]
+exts."maritime.scenario".open_window_on_startup = true

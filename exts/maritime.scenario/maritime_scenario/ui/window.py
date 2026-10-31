@@ -1,0 +1,410 @@
+"""The "Maritime Scenario" panel -- ported from boat_mesh_pipeline/06_scenario_editor/scenario_ui.py,
+talking to the controller/manager instead of reaching into a shared Script-Editor globals dict.
+
+Mouse-click placement (ghost preview, click-to-place, click-to-add-a-waypoint) lives in
+ui/placement.py's PlacementController, kept separate from the widget layout here since it owns its own
+USD prims (ghost, waypoint markers) and viewport/keyboard subscriptions -- this window just wires its
+buttons/fields to that controller's methods and reflects its callbacks (status text, waypoint count,
+live yaw) back into the UI. Numeric X/Y/Yaw fields + a waypoints text field stay available alongside
+mouse placement as a fallback (same as the original scenario_ui.py: typing always worked even when
+viewport picking was unavailable or broken).
+"""
+import omni.ui as ui
+import omni.kit.async_engine
+
+from .placement import PlacementController
+from .tile_placement import MAX_TILE_LEVEL, TilePlacementController, size_for_level
+
+
+class ScenarioWindow:
+  def __init__(self, controller):
+    self._sc = controller
+    self._mesh_choices = []   # [(label, mesh_id), ...], refreshed by _refresh_mesh_choices()
+    self._placement = PlacementController(
+      controller,
+      on_status=self._on_placement_status,
+      on_waypoint_count=self._on_waypoint_count,
+      on_yaw_changed=self._on_placement_yaw_changed,
+    )
+    self._tile_placement = TilePlacementController(controller, on_status=self._on_tile_status)
+    self._window = ui.Window("Maritime Scenario", width=420, height=560)
+    with self._window.frame:
+      with ui.ScrollingFrame(vertical_scrollbar_policy=ui.ScrollBarPolicy.SCROLLBAR_ALWAYS_ON,
+                              horizontal_scrollbar_policy=ui.ScrollBarPolicy.SCROLLBAR_ALWAYS_OFF):
+        with ui.VStack(spacing=8, style={"margin": 10}):
+          self._build_setup_section()
+          ui.Spacer(height=14)
+          self._build_wave_section()
+          ui.Spacer(height=14)
+          self._build_wave_tiles_section()
+          ui.Spacer(height=14)
+          self._build_own_ship_section()
+          ui.Spacer(height=14)
+          self._build_ship_physics_section()
+          ui.Spacer(height=14)
+          self._build_vessel_section()
+          ui.Spacer(height=14)
+          self._build_save_load_section()
+
+  # ------------------------------------------------------------ Build / status
+  def _build_setup_section(self):
+    ui.Label("Setup", height=24, alignment=ui.Alignment.CENTER, style={"font_size": 16})
+    self._status_label = ui.Label(self._status_text(), height=18, word_wrap=True,
+                                   style={"color": 0xFFFFCC66})
+    ui.Button("Build scene (wave + own ship + vessel pool)", height=32, clicked_fn=self._on_build_clicked)
+    ui.Label("Sets up the wave INFRASTRUCTURE (physics-ready sea state + the salt_water material, which "
+             "needs a stage save+reopen to take effect -- expect a short pause) and spawns the own ship "
+             "+ an empty vessel pool -- but places NO visible water yet. Run this once, then pick a water "
+             "layout below (\"Build default wave plane\" for the classic single plane, or \"Place tiles "
+             "with mouse\" for the grid), then press Play.", height=64, word_wrap=True,
+             style={"color": 0xFF888888})
+
+  def _status_text(self):
+    return "status: ready" if self._sc.ready else "status: not built yet -- press Build scene"
+
+  def _on_build_clicked(self):
+    async def _run():
+      self._status_label.text = "status: building..."
+      try:
+        await self._sc.setup_async()
+      except Exception as exc:
+        self._status_label.text = f"status: build failed ({exc}) -- see console"
+        raise
+      self._status_label.text = self._status_text()
+      self._refresh_mesh_choices()
+
+    omni.kit.async_engine.run_coroutine(_run())
+
+  def _refresh_mesh_choices(self):
+    self._mesh_choices = [(m.mesh_id, m.mesh_id) for m in self._sc.list_mesh_choices()]
+    if hasattr(self, "_own_ship_mesh_combo"):
+      self._rebuild_combo(self._own_ship_mesh_combo, [label for label, _ in self._mesh_choices])
+    if hasattr(self, "_vessel_mesh_combo"):
+      self._rebuild_combo(self._vessel_mesh_combo, [label for label, _ in self._mesh_choices])
+
+  @staticmethod
+  def _rebuild_combo(combo, items):
+    model = combo.model
+    for item in list(model.get_item_children()):
+      model.remove_item(item)
+    for item in items:
+      model.append_child_item(None, ui.SimpleStringModel(item))
+
+  # ------------------------------------------------------------ Wave
+  def _build_wave_section(self):
+    ui.Label("Gerstner Wave", height=26, alignment=ui.Alignment.CENTER, style={"font_size": 16})
+    wave = self._sc.state.wave
+    self._wave_slider("Amplitude (m):", "amplitude_m", 0.0, 5.0, wave.amplitude_m)
+    self._wave_slider("Wavelength (m):", "wavelength_m", 1.0, 60.0, wave.wavelength_m, fmt="{:.1f}")
+    self._wave_slider("Speed (m/s):", "speed_mps", 0.0, 15.0, wave.speed_mps, fmt="{:.1f}")
+    self._wave_slider("Steepness (0-1):", "steepness", 0.0, 1.0, wave.steepness)
+    self._wave_slider("Number of wave trains:", "num_waves", 1, 4, wave.num_waves, is_int=True, fmt="{}")
+    self._wave_slider("Size (m):", "size_m", 10.0, 400.0, wave.size_m, fmt="{:.0f}")
+    self._wave_slider("Resolution (points/side):", "resolution", 8, 160, wave.resolution, is_int=True, fmt="{}")
+    ui.Spacer(height=6)
+    ui.Button("Build default wave plane (classic single NxN, from the sliders above)", height=30,
+              clicked_fn=lambda: self._sc.set_wave_single_plane())
+    ui.Label("Replaces whatever water layout currently exists (including any tiles placed with the "
+             "mouse below) with one plane sized by Size/Resolution above.", height=32, word_wrap=True,
+             style={"color": 0xFF888888})
+    ui.Spacer(height=6)
+    ui.Label("Active radius (m) -- tiles farther than this from the own ship stop animating (frozen, "
+             "still visible) to save per-frame cost. Only helps once it's smaller than how far your "
+             "tiles actually extend -- try shrinking it if things slow down.", height=48, word_wrap=True,
+             style={"color": 0xFF888888})
+    with ui.HStack():
+      active_radius_slider = ui.FloatSlider(min=50.0, max=2000.0, height=20)
+      active_radius_slider.model.set_value(150.0)
+      active_radius_value_label = ui.Label("150m", width=55)
+
+      def _on_active_radius_changed(m):
+        radius = m.get_value_as_float()
+        active_radius_value_label.text = f"{radius:.0f}m"
+        self._sc.set_wave_active_radius(radius)
+
+      active_radius_slider.model.add_value_changed_fn(_on_active_radius_changed)
+
+  def _wave_slider(self, label, field, lo, hi, init, is_int=False, fmt="{:.2f}"):
+    ui.Label(label, height=20)
+    with ui.HStack():
+      s = ui.IntSlider(min=lo, max=hi, height=20) if is_int else ui.FloatSlider(min=lo, max=hi, height=20)
+      s.model.set_value(init)
+      value_label = ui.Label(fmt.format(init), width=55)
+
+      def _on_changed(m):
+        val = m.get_value_as_int() if is_int else m.get_value_as_float()
+        value_label.text = fmt.format(val)
+        self._sc.set_wave(**{field: val})
+
+      s.model.add_value_changed_fn(_on_changed)
+
+  # ------------------------------------------------------------ Wave tiles (advanced, optional)
+  def _build_wave_tiles_section(self):
+    ui.Label("Water Tiles (advanced -- lay extra tiles with the mouse)", height=32,
+             alignment=ui.Alignment.CENTER, style={"font_size": 16}, word_wrap=True)
+    ui.Label("Independent of the single Size/Resolution sliders above. Tile size is restricted to "
+             "powers of 2 so placing a bigger tile over smaller ones automatically replaces them "
+             "(\"coarsening\") -- placing a smaller tile where a bigger one already sits is blocked "
+             "(red) instead; use Delete mode to remove the bigger one first. Resolution below is the "
+             "BASE (smallest-tile) resolution -- bigger levels scale it up automatically so vertex "
+             "spacing matches exactly at every level (no cracks between different-sized neighbors).",
+             height=76, word_wrap=True, style={"color": 0xFF888888})
+    with ui.HStack(spacing=6):
+      ui.Label("Tile size", width=90)
+      self._tile_level_slider = ui.IntSlider(min=0, max=MAX_TILE_LEVEL, height=20)
+      self._tile_level_slider.model.set_value(self._tile_placement.tile_level)
+      self._tile_level_label = ui.Label("", width=110)
+
+      def _refresh_tile_level_label():
+        level = self._tile_level_slider.model.get_value_as_int()
+        res = self._tile_placement.resolution_for_level(level)
+        self._tile_level_label.text = f"{size_for_level(level):.0f}m ({res}x{res})"
+
+      def _on_level_changed(m):
+        self._tile_placement.set_tile_level(m.get_value_as_int())
+        _refresh_tile_level_label()
+
+      self._tile_level_slider.model.add_value_changed_fn(_on_level_changed)
+      _refresh_tile_level_label()
+    with ui.HStack(spacing=6):
+      ui.Label("Base resolution", width=90)
+      self._tile_resolution_field = ui.IntField(height=24)
+      self._tile_resolution_field.model.set_value(self._tile_placement.base_resolution)
+
+      def _on_base_resolution_changed(m):
+        self._tile_placement.set_base_resolution(m.get_value_as_int())
+        _refresh_tile_level_label()
+
+      self._tile_resolution_field.model.add_value_changed_fn(_on_base_resolution_changed)
+    with ui.HStack(spacing=6):
+      ui.Button("Place tiles with mouse", height=30, clicked_fn=self._on_place_tile_with_mouse)
+      ui.Button("Delete tile with mouse", height=30, clicked_fn=self._on_delete_tile_with_mouse)
+      ui.Button("Stop", height=30, clicked_fn=lambda: self._tile_placement.cancel())
+    with ui.HStack(spacing=6):
+      ui.Button("Undo last tile", height=28, clicked_fn=lambda: self._tile_placement.undo_last())
+      ui.Button("Clear all tiles", height=28, clicked_fn=lambda: self._sc.clear_water_tiles())
+    self._tile_status_label = ui.Label("", height=18, word_wrap=True, style={"color": 0xFFFFCC66})
+
+  def _on_place_tile_with_mouse(self):
+    self._placement.cancel()   # mutual exclusion -- only one mouse-placement mode listens at a time
+    self._tile_placement.start(mode="place")
+
+  def _on_delete_tile_with_mouse(self):
+    self._placement.cancel()   # mutual exclusion -- only one mouse-placement mode listens at a time
+    self._tile_placement.start(mode="delete")
+
+  def _on_tile_status(self, text):
+    # the status text itself already carries the running tile count (TilePlacementController's own
+    # on_status calls say "N tile(s) placed..."), so a separate on_tile_count display isn't needed here.
+    self._tile_status_label.text = text
+
+  # ------------------------------------------------------------ Own ship
+  def _build_own_ship_section(self):
+    ui.Label("Own Ship", height=26, alignment=ui.Alignment.CENTER, style={"font_size": 16})
+    labels = [label for label, _ in self._mesh_choices] or ["(press Build scene first)"]
+    self._own_ship_mesh_combo = ui.ComboBox(0, *labels, height=24)
+
+    def _apply():
+      if not self._mesh_choices:
+        return
+      idx = self._own_ship_mesh_combo.model.get_item_value_model().get_value_as_int()
+      _, mesh_id = self._mesh_choices[idx]
+      self._sc.set_own_ship_mesh(mesh_id)
+
+    ui.Button("Apply to own ship", height=28, clicked_fn=_apply)
+    ui.Label("I/J/K/L = forward/left/back/right while held (not WASD -- those are Isaac Sim's own "
+             "viewport camera shortcuts).", height=32, word_wrap=True, style={"color": 0xFF888888})
+
+  # ------------------------------------------------------------ Ship physics
+  def _build_ship_physics_section(self):
+    ui.Label("Ship Physics (applies to the own ship AND every vessel)", height=32,
+             alignment=ui.Alignment.CENTER, style={"font_size": 16}, word_wrap=True)
+    sp = self._sc.state.ship_physics
+    self._physics_slider("Draft / beam ratio (T/B):", "draft_to_beam_ratio", 0.05, 1.0, sp.draft_to_beam_ratio)
+    self._physics_slider("Waterplane coeff:", "waterplane_coeff", 0.3, 1.0, sp.waterplane_coeff)
+    self._physics_slider("GM coeff (roll stiffness):", "gm_coeff", 0.05, 0.3, sp.gm_coeff)
+    self._physics_slider("GML coeff (pitch stiffness):", "gml_coeff", 0.2, 1.0, sp.gml_coeff)
+    self._physics_slider("Roll gyration coeff:", "roll_gyration_coeff", 0.1, 0.6, sp.roll_gyration_coeff)
+    self._physics_slider("Pitch gyration coeff:", "pitch_gyration_coeff", 0.1, 0.5, sp.pitch_gyration_coeff)
+    self._physics_slider("Yaw gyration coeff:", "yaw_gyration_coeff", 0.1, 0.5, sp.yaw_gyration_coeff)
+    self._physics_slider("Damping ratio:", "damping_ratio", 0.0, 1.0, sp.damping_ratio)
+
+  def _physics_slider(self, label, field, lo, hi, init, fmt="{:.2f}"):
+    ui.Label(label, height=20)
+    with ui.HStack():
+      s = ui.FloatSlider(min=lo, max=hi, height=20)
+      s.model.set_value(init)
+      value_label = ui.Label(fmt.format(init), width=55)
+
+      def _on_changed(m):
+        val = m.get_value_as_float()
+        value_label.text = fmt.format(val)
+        self._sc.set_ship_physics(**{field: val})
+
+      s.model.add_value_changed_fn(_on_changed)
+
+  # ------------------------------------------------------------ Vessels
+  def _build_vessel_section(self):
+    ui.Label("Vessels", height=26, alignment=ui.Alignment.CENTER, style={"font_size": 16})
+    labels = [label for label, _ in self._mesh_choices] or ["(press Build scene first)"]
+    behaviors = ["forward", "backward", "turn_left", "turn_right", "stationary", "follow_path"]
+
+    ui.Label("Mesh:", height=18)
+    self._vessel_mesh_combo = ui.ComboBox(0, *labels, height=24)
+    ui.Label("Behavior:", height=18)
+    self._behavior_combo = ui.ComboBox(0, *behaviors, height=24)
+
+    with ui.HStack(spacing=6):
+      ui.Label("Linear", width=50)
+      self._linear_field = ui.FloatField(height=24)
+      self._linear_field.model.set_value(0.3)
+      ui.Label("Angular", width=55)
+      self._angular_field = ui.FloatField(height=24)
+      self._angular_field.model.set_value(0.01)
+
+    ui.Spacer(height=10)
+    ui.Label("Place with mouse (click a spot to spawn there; for follow_path, each click adds a "
+             "waypoint instead):", height=32, word_wrap=True)
+    with ui.HStack(spacing=6):
+      ui.Button("Place with mouse", height=30, clicked_fn=self._on_place_with_mouse)
+      ui.Button("Finish Path", height=30, clicked_fn=lambda: self._placement.finish_path())
+      ui.Button("Cancel", height=30, clicked_fn=lambda: self._placement.cancel())
+    self._path_status_label = ui.Label("", height=18, style={"color": 0xFFFFCC66})
+
+    ui.Spacer(height=10)
+    ui.Label("...or type an exact position/heading:", height=18)
+    with ui.HStack(spacing=6):
+      ui.Label("X (m)", width=40)
+      self._x_field = ui.FloatField(height=24)
+      ui.Label("Y (m)", width=40)
+      self._y_field = ui.FloatField(height=24)
+    with ui.HStack(spacing=6):
+      ui.Label("Yaw (deg)", width=70)
+      self._yaw_field = ui.FloatField(height=24)
+      self._yaw_field.model.add_value_changed_fn(lambda m: self._placement.set_yaw(m.get_value_as_float()))
+      ui.Button("-", width=28, height=24, clicked_fn=lambda: self._placement.nudge_yaw(-1.0))
+      ui.Button("+", width=28, height=24, clicked_fn=lambda: self._placement.nudge_yaw(1.0))
+    with ui.HStack(spacing=6):
+      ui.Label("Step (deg)", width=70)
+      self._yaw_step_field = ui.FloatField(height=24)
+      self._yaw_step_field.model.set_value(15.0)
+      self._yaw_step_field.model.add_value_changed_fn(
+        lambda m: self._placement.set_yaw_step(m.get_value_as_float()))
+    ui.Label("While placing: [ / ] also nudge yaw by Step (if keyboard events reach this window)",
+             height=16, style={"color": 0xFF888888})
+
+    ui.Label("Waypoints for follow_path (x1,y1; x2,y2; ... -- first point is the spawn point, used by "
+             "the typed-position Spawn button below, NOT by mouse placement which collects its own):",
+             height=44, word_wrap=True)
+    self._waypoints_field = ui.StringField(height=24)
+
+    ui.Button("Spawn vessel (typed position)", height=30, clicked_fn=self._on_spawn_vessel)
+
+    ui.Spacer(height=10)
+    with ui.HStack(spacing=6):
+      show_paths_checkbox = ui.CheckBox(width=24, height=24)
+      show_paths_checkbox.model.set_value(True)
+      show_paths_checkbox.model.add_value_changed_fn(
+        lambda m: self._placement.set_show_paths(m.get_value_as_bool()))
+      ui.Label("Show paths (spawned follow_path routes)", height=24)
+
+    ui.Spacer(height=8)
+    with ui.HStack(spacing=6):
+      ui.Label("Random swarm count", width=120)
+      self._count_field = ui.IntField(height=24)
+      self._count_field.model.set_value(5)
+      ui.Button("Set", width=60, height=24, clicked_fn=self._on_set_count)
+    ui.Button("Clear all vessels", height=28, clicked_fn=lambda: self._placement.clear_all())
+
+  def _on_place_with_mouse(self):
+    if not self._mesh_choices:
+      return
+    idx = self._vessel_mesh_combo.model.get_item_value_model().get_value_as_int()
+    _, mesh_id = self._mesh_choices[idx]
+    behaviors = ["forward", "backward", "turn_left", "turn_right", "stationary", "follow_path"]
+    behavior = behaviors[self._behavior_combo.model.get_item_value_model().get_value_as_int()]
+    self._placement.set_yaw(self._yaw_field.model.get_value_as_float())
+    self._placement.set_yaw_step(self._yaw_step_field.model.get_value_as_float())
+    self._tile_placement.cancel()   # mutual exclusion -- only one mouse-placement mode listens at a time
+    self._placement.start(mesh_id, behavior, linear_speed=self._linear_field.model.get_value_as_float(),
+                           angular_speed=self._angular_field.model.get_value_as_float())
+
+  def _on_placement_status(self, text):
+    self._path_status_label.text = text
+
+  def _on_waypoint_count(self, n):
+    self._path_status_label.text = f"{n} waypoint(s) placed -- click to add more, then Finish Path"
+
+  def _on_placement_yaw_changed(self, yaw_deg):
+    self._yaw_field.model.set_value(yaw_deg)
+
+  def _on_spawn_vessel(self):
+    if not self._mesh_choices:
+      return
+    idx = self._vessel_mesh_combo.model.get_item_value_model().get_value_as_int()
+    _, mesh_id = self._mesh_choices[idx]
+    behaviors = ["forward", "backward", "turn_left", "turn_right", "stationary", "follow_path"]
+    behavior = behaviors[self._behavior_combo.model.get_item_value_model().get_value_as_int()]
+    waypoints = self._parse_waypoints(self._waypoints_field.model.get_value_as_string())
+    linear = self._linear_field.model.get_value_as_float()
+    angular = self._angular_field.model.get_value_as_float()
+
+    if behavior == "follow_path":
+      if len(waypoints) < 2:
+        print("[maritime_scenario] follow_path needs >=2 points in the waypoints field (first = spawn point)")
+        return
+      start, rest = waypoints[0], waypoints[1:]
+      vessel = self._sc.spawn_vessel(mesh_id, start[0], start[1], None, behavior, waypoints=rest,
+                                      linear_speed=linear, angular_speed=angular)
+      if vessel is not None:
+        self._placement._draw_persistent_path(vessel.name, waypoints)   # typed path needs drawing too
+    else:
+      self._sc.spawn_vessel(mesh_id, self._x_field.model.get_value_as_float(),
+                             self._y_field.model.get_value_as_float(),
+                             self._yaw_field.model.get_value_as_float(), behavior,
+                             linear_speed=linear, angular_speed=angular)
+
+  @staticmethod
+  def _parse_waypoints(text):
+    points = []
+    for chunk in text.split(";"):
+      chunk = chunk.strip()
+      if not chunk:
+        continue
+      x_str, _, y_str = chunk.partition(",")
+      try:
+        points.append((float(x_str), float(y_str)))
+      except ValueError:
+        print(f"[maritime_scenario] skipping malformed waypoint {chunk!r} (expected 'x,y')")
+    return points
+
+  def _on_set_count(self):
+    self._sc.set_vessel_count(self._count_field.model.get_value_as_int())
+
+  # ------------------------------------------------------------ Save / load
+  def _build_save_load_section(self):
+    ui.Label("Save / load scenario", height=26, alignment=ui.Alignment.CENTER, style={"font_size": 16})
+    self._filename_field = ui.StringField(height=24)
+    self._filename_field.model.set_value("scenario1.json")
+    with ui.HStack(spacing=6):
+      ui.Button("Save", height=30, clicked_fn=lambda: self._sc.save(self._filename_field.model.get_value_as_string()))
+      ui.Button("Load", height=30, clicked_fn=self._on_load_clicked)
+
+  def _on_load_clicked(self):
+    self._sc.load(self._filename_field.model.get_value_as_string())
+    self._refresh_mesh_choices()
+    self._placement.redraw_all_persistent_paths()
+
+  # ------------------------------------------------------------ window lifecycle
+  @property
+  def visible(self):
+    return self._window.visible
+
+  @visible.setter
+  def visible(self, value):
+    self._window.visible = value
+
+  def destroy(self):
+    self._placement.teardown()
+    self._tile_placement.teardown()
+    self._window.destroy()

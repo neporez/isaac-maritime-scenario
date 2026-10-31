@@ -1,0 +1,13 @@
+[project]
+name = "isaac-maritime-scenario"
+version = "0.1.0"
+description = "Maritime scenario building for NVIDIA Isaac Sim -- waves, own ship, vessel traffic"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[tool.pytest.ini_options]
+pythonpath = ["exts/maritime.scenario"]
+testpaths = ["tests"]
