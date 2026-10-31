@@ -1,6 +1,6 @@
 """ScenarioManager.ensure_default_light() against a REAL in-memory USD stage -- no omni/carb stubs
 needed, runtime/manager.py only imports pxr inside the method itself."""
-from pxr import Usd, UsdGeom, UsdLux
+from pxr import Usd, UsdLux
 
 from maritime_scenario.runtime.manager import ScenarioManager
 
@@ -10,8 +10,9 @@ def test_ensure_default_light_adds_a_light_to_an_empty_stage():
   ScenarioManager.ensure_default_light(stage)
   light_prim = stage.GetPrimAtPath("/World/DefaultLight")
   assert light_prim
+  assert light_prim.GetTypeName() == "DomeLight"
   assert light_prim.HasAPI(UsdLux.LightAPI)
-  assert UsdLux.DistantLight(light_prim).GetIntensityAttr().Get() == 1000.0
+  assert UsdLux.DomeLight(light_prim).GetIntensityAttr().Get() == 1000.0
 
 
 def test_ensure_default_light_is_idempotent():
@@ -24,12 +25,12 @@ def test_ensure_default_light_is_idempotent():
 
 def test_ensure_default_light_does_nothing_if_any_light_already_exists():
   stage = Usd.Stage.CreateInMemory()
-  UsdLux.DomeLight.Define(stage, "/World/UserDome")
+  UsdLux.DistantLight.Define(stage, "/World/UserSun")
   ScenarioManager.ensure_default_light(stage)
   assert not stage.GetPrimAtPath("/World/DefaultLight")
   lights = [p for p in Usd.PrimRange(stage.GetPseudoRoot()) if p.HasAPI(UsdLux.LightAPI)]
   assert len(lights) == 1
-  assert lights[0].GetPath() == "/World/UserDome"
+  assert lights[0].GetPath() == "/World/UserSun"
 
 
 def test_ensure_default_light_respects_an_unrelated_light_type_too():
