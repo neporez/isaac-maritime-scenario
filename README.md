@@ -4,10 +4,6 @@
 
 **Physically-based waves, a controllable own ship, and autonomous vessel traffic for [NVIDIA Isaac Sim](https://developer.nvidia.com/isaac/sim) — from a panel or from Python.**
 
-<img src="docs/images/hero.png" width="100%" alt="A maritime scenario in Isaac Sim: tiled Gerstner waves, the own ship, and vessel traffic with waypoint paths"/>
-
-*Every boat here floats because of its own measured size, not a hand-picked spring constant.*
-
 </div>
 
 ---
